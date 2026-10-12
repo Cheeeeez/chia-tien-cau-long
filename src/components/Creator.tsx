@@ -6,6 +6,7 @@ import { expenseAmount, formatVnd } from '../lib/money';
 import { settle } from '../lib/split';
 import { loadRoster, saveRoster } from '../lib/storage';
 import type { Draft, DraftExpense, Member } from '../lib/types';
+import { InstallButton } from './InstallButton';
 import { RosterEditor } from './RosterEditor';
 import { SettlementView } from './SettlementView';
 
@@ -116,6 +117,7 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
   return (
     <main>
       <h1>🏸 Chia tiền cầu lông</h1>
+      <InstallButton />
 
       <section>
         <h2>Thành viên</h2>

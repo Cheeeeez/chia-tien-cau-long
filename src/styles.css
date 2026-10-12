@@ -57,3 +57,4 @@ td:nth-child(n + 2), th:nth-child(n + 2) { text-align: right; }
 .copy-row label span { display: block; font-size: 0.85rem; color: var(--muted); }
 .open-app > * + * { margin-top: 8px; }
 .open-app .btn { width: 100%; }
+.install > * + * { margin-top: 8px; }
