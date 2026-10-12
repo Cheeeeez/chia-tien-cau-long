@@ -1,0 +1,212 @@
+[
+ {
+  "bin": "970425",
+  "code": "ABB",
+  "shortName": "ABBANK"
+ },
+ {
+  "bin": "970416",
+  "code": "ACB",
+  "shortName": "ACB"
+ },
+ {
+  "bin": "970405",
+  "code": "VBA",
+  "shortName": "Agribank"
+ },
+ {
+  "bin": "970409",
+  "code": "BAB",
+  "shortName": "BacABank"
+ },
+ {
+  "bin": "970438",
+  "code": "BVB",
+  "shortName": "BaoVietBank"
+ },
+ {
+  "bin": "970418",
+  "code": "BIDV",
+  "shortName": "BIDV"
+ },
+ {
+  "bin": "546034",
+  "code": "CAKE",
+  "shortName": "CAKE"
+ },
+ {
+  "bin": "422589",
+  "code": "CIMB",
+  "shortName": "CIMB"
+ },
+ {
+  "bin": "970446",
+  "code": "COOPBANK",
+  "shortName": "COOPBANK"
+ },
+ {
+  "bin": "970431",
+  "code": "EIB",
+  "shortName": "Eximbank"
+ },
+ {
+  "bin": "970437",
+  "code": "HDB",
+  "shortName": "HDBank"
+ },
+ {
+  "bin": "668888",
+  "code": "KBank",
+  "shortName": "KBank"
+ },
+ {
+  "bin": "970452",
+  "code": "KLB",
+  "shortName": "KienLongBank"
+ },
+ {
+  "bin": "970449",
+  "code": "LPB",
+  "shortName": "LPBank"
+ },
+ {
+  "bin": "970422",
+  "code": "MB",
+  "shortName": "MBBank"
+ },
+ {
+  "bin": "970414",
+  "code": "MBV",
+  "shortName": "MBV"
+ },
+ {
+  "bin": "971025",
+  "code": "momo",
+  "shortName": "MoMo"
+ },
+ {
+  "bin": "970426",
+  "code": "MSB",
+  "shortName": "MSB"
+ },
+ {
+  "bin": "970428",
+  "code": "NAB",
+  "shortName": "NamABank"
+ },
+ {
+  "bin": "970419",
+  "code": "NCB",
+  "shortName": "NCB"
+ },
+ {
+  "bin": "970448",
+  "code": "OCB",
+  "shortName": "OCB"
+ },
+ {
+  "bin": "970430",
+  "code": "PGB",
+  "shortName": "PGBank"
+ },
+ {
+  "bin": "970412",
+  "code": "PVCB",
+  "shortName": "PVcomBank"
+ },
+ {
+  "bin": "971133",
+  "code": "PVDB",
+  "shortName": "PVcomBank Pay"
+ },
+ {
+  "bin": "970403",
+  "code": "STB",
+  "shortName": "Sacombank"
+ },
+ {
+  "bin": "970400",
+  "code": "SGICB",
+  "shortName": "SaigonBank"
+ },
+ {
+  "bin": "970429",
+  "code": "SCB",
+  "shortName": "SCB"
+ },
+ {
+  "bin": "970440",
+  "code": "SEAB",
+  "shortName": "SeABank"
+ },
+ {
+  "bin": "970443",
+  "code": "SHB",
+  "shortName": "SHB"
+ },
+ {
+  "bin": "970424",
+  "code": "SHBVN",
+  "shortName": "ShinhanBank"
+ },
+ {
+  "bin": "970407",
+  "code": "TCB",
+  "shortName": "Techcombank"
+ },
+ {
+  "bin": "963388",
+  "code": "TIMO",
+  "shortName": "Timo"
+ },
+ {
+  "bin": "970423",
+  "code": "TPB",
+  "shortName": "TPBank"
+ },
+ {
+  "bin": "546035",
+  "code": "Ubank",
+  "shortName": "Ubank"
+ },
+ {
+  "bin": "970441",
+  "code": "VIB",
+  "shortName": "VIB"
+ },
+ {
+  "bin": "970427",
+  "code": "VAB",
+  "shortName": "VietABank"
+ },
+ {
+  "bin": "970433",
+  "code": "VIETBANK",
+  "shortName": "VietBank"
+ },
+ {
+  "bin": "970454",
+  "code": "VCCB",
+  "shortName": "VietCapitalBank"
+ },
+ {
+  "bin": "970436",
+  "code": "VCB",
+  "shortName": "Vietcombank"
+ },
+ {
+  "bin": "970415",
+  "code": "ICB",
+  "shortName": "VietinBank"
+ },
+ {
+  "bin": "970432",
+  "code": "VPB",
+  "shortName": "VPBank"
+ },
+ {
+  "bin": "970457",
+  "code": "WVN",
+  "shortName": "Woori"
+ }
+]
