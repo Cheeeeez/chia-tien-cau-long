@@ -8,7 +8,8 @@
   --error: #c0262d;
 }
 * { box-sizing: border-box; }
-html, body { touch-action: pan-x pan-y; } /* chặn pinch-zoom và double-tap zoom, vẫn cuộn được */
+html { overflow-x: hidden; }
+html, body { touch-action: pan-y; } /* chặn pinch-zoom, double-tap zoom và kéo ngang; vẫn cuộn dọc */
 body {
   margin: 0;
   background: var(--bg);
@@ -30,7 +31,8 @@ button, .btn, input, select {
   font: inherit; min-height: 44px; border-radius: 8px; border: 1px solid var(--border);
   padding: 8px 12px; background: var(--card); color: var(--fg);
 }
-input, select { width: 100%; }
+input, select { width: 100%; min-width: 0; max-width: 100%; }
+input[type='date'] { appearance: none; -webkit-appearance: none; } /* iOS: ô date có độ rộng nội tại, hay tràn khỏi khung */
 input[type='checkbox'] { width: 22px; min-height: 22px; }
 button, .btn { cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
 button.primary, .btn { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -39,7 +41,7 @@ button.primary { color: #fff; }
 .card > * + * { margin-top: 8px; }
 .field { display: block; margin: 6px 0; }
 .field > span { display: block; font-size: 0.85rem; color: var(--muted); margin-bottom: 2px; }
-.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
 .row-actions { display: flex; gap: 8px; align-items: center; }
 .row-actions.wrap { flex-wrap: wrap; margin-top: 12px; }
 .row-actions.between { justify-content: space-between; }
