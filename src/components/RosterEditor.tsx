@@ -68,7 +68,7 @@ export function RosterEditor({
             </div>
             <div class="row-actions">
               <button type="button" onClick={() => edit(m)}>Sửa</button>
-              <button type="button" onClick={() => onChange(roster.filter((x) => x.id !== m.id))}>Xoá</button>
+              <button type="button" class="danger" onClick={() => onChange(roster.filter((x) => x.id !== m.id))}>Xoá</button>
             </div>
           </li>
         ))}
@@ -99,7 +99,7 @@ export function RosterEditor({
           {error && <p class="error">{error}</p>}
           <div class="row-actions">
             <button type="submit" class="primary">Lưu</button>
-            <button type="button" onClick={() => { setForm(null); setError(''); }}>Huỷ</button>
+            <button type="button" class="neutral" onClick={() => { setForm(null); setError(''); }}>Huỷ</button>
           </div>
         </form>
       ) : (

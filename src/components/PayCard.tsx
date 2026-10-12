@@ -145,7 +145,7 @@ export function PayCard({ bill, t, baseUrl }: { bill: Bill; t: Transfer; baseUrl
             </optgroup>
           </select>
           {href && app && (
-            <a class="btn" href={href}>
+            <a class="btn primary" href={href}>
               Mở {app.appName}
             </a>
           )}

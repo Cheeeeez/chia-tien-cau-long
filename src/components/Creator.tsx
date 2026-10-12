@@ -184,6 +184,7 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
               <strong>{formatVnd(expenseAmount(x.qty, x.unitPrice))}</strong>
               <button
                 type="button"
+                class="danger"
                 onClick={() => setDraft((d) => ({ ...d, expenses: d.expenses.filter((y) => y.key !== x.key) }))}
               >
                 Xoá

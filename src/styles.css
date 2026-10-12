@@ -5,7 +5,9 @@
   --card: #fff;
   --border: #d8dadf;
   --accent: #0a7d4f;
+  --accent-bg: #e6f4ec;
   --error: #c0262d;
+  --error-bg: #fdecec;
 }
 * { box-sizing: border-box; }
 html { overflow-x: hidden; }
@@ -34,9 +36,14 @@ button, .btn, input, select {
 input, select { width: 100%; min-width: 0; max-width: 100%; }
 input[type='date'] { appearance: none; -webkit-appearance: none; } /* iOS: ô date có độ rộng nội tại, hay tràn khỏi khung */
 input[type='checkbox'] { width: 22px; min-height: 22px; }
-button, .btn { cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; }
-button.primary, .btn { background: var(--accent); border-color: var(--accent); color: #fff; }
-button.primary { color: #fff; }
+button, .btn { cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; }
+/* Nút hành động: mặc định xanh nhạt; .primary xanh đặc; .danger đỏ; .neutral xám (huỷ). */
+button, .btn { background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+button.primary, .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button.danger { background: var(--error-bg); border-color: var(--error); color: var(--error); }
+button.neutral { background: var(--card); border-color: var(--border); color: var(--muted); }
+button:active, .btn:active { filter: brightness(0.92); }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 12px; margin: 8px 0; display: block; }
 .card > * + * { margin-top: 8px; }
 .field { display: block; margin: 6px 0; }
