@@ -9,11 +9,13 @@ import type { Draft, DraftExpense, Member } from '../lib/types';
 import { RosterEditor } from './RosterEditor';
 import { SettlementView } from './SettlementView';
 
-const newExpense = (label: string): DraftExpense => ({
+const SHUTTLE_PRICE = 30000;
+
+const newExpense = (label: string, unitPrice = 0): DraftExpense => ({
   key: crypto.randomUUID(),
   label,
   qty: 1,
-  unitPrice: 0,
+  unitPrice,
   payerId: '',
 });
 
@@ -52,7 +54,7 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
   const [roster, setRoster] = useState<Member[]>(loadRoster);
   const [draft, setDraft] = useState<Draft>(() => ({
     date: today(),
-    expenses: [newExpense('Tiền sân'), newExpense('Tiền cầu')],
+    expenses: [newExpense('Tiền sân'), newExpense('Tiền cầu', SHUTTLE_PRICE)],
     weights: {},
   }));
   const [feedback, setFeedback] = useState('');
@@ -187,7 +189,10 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
             </div>
           </div>
         ))}
-        <button type="button" onClick={() => setDraft((d) => ({ ...d, expenses: [...d.expenses, newExpense('')] }))}>
+        <button
+          type="button"
+          onClick={() => setDraft((d) => ({ ...d, expenses: [...d.expenses, newExpense('Tiền cầu', SHUTTLE_PRICE)] }))}
+        >
           + Thêm khoản
         </button>
       </section>

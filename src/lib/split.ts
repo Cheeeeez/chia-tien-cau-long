@@ -1,4 +1,5 @@
 import { expenseAmount, roundUpThousand } from './money';
+import { toAsciiUpper } from './text';
 import type { Bill } from './types';
 
 export type Transfer = { from: number; to: number; exact: number; amount: number };
@@ -9,6 +10,12 @@ export type Settlement = {
   balances: number[];
   transfers: Transfer[];
 };
+
+/** Người ứng tiền sân: payer của khoản đầu tiên có nhãn chứa "sân"; không có thì payer của khoản đầu tiên. */
+export function findHub(bill: Bill): number {
+  const court = bill.e.find((x) => /\bSAN\b/.test(toAsciiUpper(x.l)));
+  return (court ?? bill.e[0]).by;
+}
 
 export function settle(bill: Bill): Settlement {
   const n = bill.p.length;
@@ -41,24 +48,17 @@ export function settle(bill: Bill): Settlement {
   });
   const balances = paid.map((p, i) => p - shares[i]);
 
+  // Chỉ chuyển cho / nhận từ người ứng tiền sân (hub); người ứng tiền cầu được hub trả lại nếu dư.
+  const hub = findHub(bill);
   const byAbsDesc = (a: number, b: number) =>
     Math.abs(balances[b]) - Math.abs(balances[a]) || a - b;
-  const creditors = balances.map((_, i) => i).filter((i) => balances[i] > 0).sort(byAbsDesc);
-  const debtors = balances.map((_, i) => i).filter((i) => balances[i] < 0).sort(byAbsDesc);
-
-  const credit = creditors.map((i) => balances[i]);
-  const debt = debtors.map((i) => -balances[i]);
-  const transfers: Transfer[] = [];
-  let ci = 0;
-  let di = 0;
-  while (ci < creditors.length && di < debtors.length) {
-    const x = Math.min(credit[ci], debt[di]);
-    transfers.push({ from: debtors[di], to: creditors[ci], exact: x, amount: roundUpThousand(x) });
-    credit[ci] -= x;
-    debt[di] -= x;
-    if (credit[ci] === 0) ci++;
-    if (debt[di] === 0) di++;
-  }
+  const others = balances.map((_, i) => i).filter((i) => i !== hub);
+  const debtors = others.filter((i) => balances[i] < 0).sort(byAbsDesc);
+  const creditors = others.filter((i) => balances[i] > 0).sort(byAbsDesc);
+  const transfers: Transfer[] = [
+    ...debtors.map((i) => ({ from: i, to: hub, exact: -balances[i], amount: roundUpThousand(-balances[i]) })),
+    ...creditors.map((i) => ({ from: hub, to: i, exact: balances[i], amount: roundUpThousand(balances[i]) })),
+  ];
 
   return { total, shares, paid, balances, transfers };
 }

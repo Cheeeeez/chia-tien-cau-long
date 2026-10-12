@@ -115,10 +115,10 @@ export function validateDraft(roster: Member[], draft: Draft): string[] {
 
   const bill = draftToBill(roster, draft);
   const s = settle(bill);
-  bill.p.forEach((person, i) => {
-    if (s.balances[i] > 0 && !person.b) {
-      errors.push(`${person.n} ứng tiền nhưng chưa có thông tin ngân hàng`);
-    }
-  });
+  const missing = new Set<number>();
+  for (const t of s.transfers) if (!bill.p[t.to].b) missing.add(t.to);
+  for (const i of [...missing].sort((x, y) => x - y)) {
+    errors.push(`${bill.p[i].n} ứng tiền nhưng chưa có thông tin ngân hàng`);
+  }
   return errors;
 }

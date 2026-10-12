@@ -44,17 +44,41 @@ describe('settle', () => {
     expect(s.shares).toEqual([100000, 100000, 50000]);
   });
 
-  it('nhiều người ứng, bù trừ', () => {
-    const s = invariants(mk(Array(8).fill(1), [['sân', 1, 300000, 0], ['cầu', 1, 140000, 1]]));
+  it('người ứng tiền cầu được người ứng tiền sân trả lại, không ai chuyển chéo', () => {
+    // 440.000 / 8 = 55.000/người; A (sân) +245.000, B (cầu) +85.000
+    const s = invariants(mk(Array(8).fill(1), [['Tiền sân', 1, 300000, 0], ['Tiền cầu', 1, 140000, 1]]));
     expect(s.transfers.map((t) => [names[t.from], names[t.to], t.amount])).toEqual([
       ['C', 'A', 55000],
       ['D', 'A', 55000],
       ['E', 'A', 55000],
       ['F', 'A', 55000],
-      ['G', 'A', 25000],
-      ['G', 'B', 30000],
-      ['H', 'B', 55000],
+      ['G', 'A', 55000],
+      ['H', 'A', 55000],
+      ['A', 'B', 85000],
     ]);
+  });
+
+  it('người ứng tiền cầu thiếu phần mình thì chuyển cho người ứng sân', () => {
+    const s = invariants(mk([1, 1, 1, 0.5], [['Tiền sân', 1, 300000, 0], ['Tiền cầu', 4, 25000, 1]]));
+    expect(s.transfers.map((t) => [names[t.from], names[t.to], t.amount])).toEqual([
+      ['C', 'A', 115000],
+      ['D', 'A', 58000],
+      ['B', 'A', 15000],
+    ]);
+  });
+
+  it('hub là người ứng khoản "sân" dù không phải khoản đầu tiên', () => {
+    const s = invariants(mk([1, 1, 1], [['Cầu', 1, 30000, 0], ['SÂN', 1, 120000, 1]]));
+    expect(s.transfers.every((t) => t.from === 1 || t.to === 1)).toBe(true);
+    expect(s.transfers.map((t) => [names[t.from], names[t.to], t.amount])).toEqual([
+      ['C', 'B', 50000],
+      ['A', 'B', 20000],
+    ]);
+  });
+
+  it('không có khoản nào ghi "sân" thì hub là người ứng khoản đầu tiên', () => {
+    const s = invariants(mk([1, 1], [['Thuê', 1, 100000, 1], ['Cầu', 1, 20000, 0]]));
+    expect(s.transfers.map((t) => [names[t.from], names[t.to], t.amount])).toEqual([['A', 'B', 40000]]);
   });
 
   it('người trả không đi (w = 0)', () => {
