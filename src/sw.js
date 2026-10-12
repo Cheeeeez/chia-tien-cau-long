@@ -4,15 +4,40 @@ const PRECACHE = __PRECACHE__; // đường dẫn tương đối với sw.js, g�
 const CACHE = `chia-tien-${VERSION}`;
 const SHELL = new URL('index.html', self.location).href;
 
+// Tải lại từ mạng, bỏ qua cache HTTP: GitHub Pages trả max-age=600 nên addAll có thể lấy nhầm index.html cũ
+// (trỏ tới asset đã bị xoá khỏi server) -> trang trắng.
+async function precache() {
+  const cache = await caches.open(CACHE);
+  try {
+    await Promise.all(
+      PRECACHE.map(async (path) => {
+        const req = new Request(path, { cache: 'reload' });
+        const res = await fetch(req);
+        if (!res.ok) throw new Error(`${path}: ${res.status}`);
+        await cache.put(req, res);
+      }),
+    );
+  } catch (err) {
+    await caches.delete(CACHE); // không để lại cache dở dang
+    throw err;
+  }
+}
+
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(PRECACHE)).then(() => self.skipWaiting()));
+  e.waitUntil(precache().then(() => self.skipWaiting()));
 });
 
+// Giữ lại cache của bản ngay trước: trang đang mở bằng bản cũ vẫn cần asset cũ khi SW mới kích hoạt giữa chừng.
+// caches.keys() trả theo thứ tự tạo.
 self.addEventListener('activate', (e) => {
   e.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('chia-tien-') && k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => {
+        const mine = keys.filter((k) => k.startsWith('chia-tien-'));
+        const keep = new Set(mine.slice(Math.max(0, mine.indexOf(CACHE) - 1), mine.indexOf(CACHE) + 1));
+        return Promise.all(mine.filter((k) => !keep.has(k)).map((k) => caches.delete(k)));
+      })
       .then(() => self.clients.claim()),
   );
 });
@@ -24,9 +49,12 @@ self.addEventListener('fetch', (e) => {
   // ignoreVary: server có thể trả `Vary: Origin`; script/style `crossorigin` gửi Origin còn lúc precache thì không.
   const opts = { ignoreVary: true };
   // Mọi trang (kể cả ?b=...) đều là cùng một index.html: trả bản đã cache để mở tức thì / khi mất mạng.
-  if (req.mode === 'navigate') {
-    e.respondWith(caches.match(SHELL, opts).then((r) => r || fetch(req)));
-    return;
-  }
-  e.respondWith(caches.match(req, opts).then((r) => r || fetch(req)));
+  const key = req.mode === 'navigate' ? SHELL : req;
+  e.respondWith(
+    caches
+      .open(CACHE)
+      .then((c) => c.match(key, opts))
+      .then((r) => r || caches.match(key, opts)) // bản trước còn giữ
+      .then((r) => r || fetch(req)),
+  );
 });
