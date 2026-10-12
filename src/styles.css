@@ -51,6 +51,7 @@ table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
 th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--border); }
 td:nth-child(n + 2), th:nth-child(n + 2) { text-align: right; }
 .qr { display: block; margin: 8px auto; max-width: 100%; height: auto; }
+.save-qr { display: block; width: 100%; }
 .copy-row { display: flex; gap: 8px; align-items: flex-end; }
 .copy-row label { flex: 1; min-width: 0; }
 .copy-row label span { display: block; font-size: 0.85rem; color: var(--muted); }

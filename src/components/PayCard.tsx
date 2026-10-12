@@ -14,6 +14,7 @@ import {
   resolveIosDeeplink,
   transferNote,
 } from '../lib/vietqr';
+import { fetchImageFile, saveImageFile } from '../lib/saveImage';
 
 function CopyRow({ label, value }: { label: string; value: string }) {
   const [state, setState] = useState<'idle' | 'ok' | 'fail'>('idle');
@@ -76,6 +77,26 @@ export function PayCard({ bill, t, baseUrl }: { bill: Bill; t: Transfer; baseUrl
   }, [ios, link]);
   const href = direct && direct.from === link ? direct.href : link;
 
+  // Tải sẵn ảnh QR: share() trên iOS phải chạy ngay trong cú bấm, không chờ mạng được.
+  const qrUrl = bank ? qrImageUrl(bank, t.amount, note) : '';
+  const [qrFile, setQrFile] = useState<{ from: string; file: File | null } | null>(null);
+  const [saveState, setSaveState] = useState<'idle' | 'ok' | 'fail'>('idle');
+  useEffect(() => {
+    if (!qrUrl) return;
+    const ctrl = new AbortController();
+    fetchImageFile(qrUrl, `vietqr-${note.replace(/\s+/g, '-')}.png`, ctrl.signal).then((file) => {
+      if (!ctrl.signal.aborted) setQrFile({ from: qrUrl, file });
+    });
+    return () => ctrl.abort();
+  }, [qrUrl, note]);
+  const readyFile = qrFile && qrFile.from === qrUrl ? qrFile : null;
+  const onSave = async () => {
+    const r = readyFile?.file ? await saveImageFile(readyFile.file, ios) : 'fail';
+    if (r === 'cancel') return;
+    setSaveState(r);
+    setTimeout(() => setSaveState('idle'), 2500);
+  };
+
   if (!bank) {
     return (
       <div class="card">
@@ -86,8 +107,6 @@ export function PayCard({ bill, t, baseUrl }: { bill: Bill; t: Transfer; baseUrl
       </div>
     );
   }
-
-  const qrUrl = qrImageUrl(bank, t.amount, note);
 
   return (
     <div class="card">
@@ -100,6 +119,9 @@ export function PayCard({ bill, t, baseUrl }: { bill: Bill; t: Transfer; baseUrl
       <a href={qrUrl} target="_blank" rel="noreferrer">
         <img class="qr" src={qrUrl} width="270" alt="Mã VietQR" />
       </a>
+      <button type="button" class="save-qr" disabled={!readyFile} onClick={onSave}>
+        {saveState === 'ok' ? 'Đã lưu ảnh' : saveState === 'fail' ? 'Không lưu được, bấm giữ ảnh QR để lưu' : 'Lưu ảnh QR'}
+      </button>
       {mobile ? (
         <div class="open-app">
           <select
