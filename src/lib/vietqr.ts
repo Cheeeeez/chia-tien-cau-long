@@ -37,8 +37,27 @@ export function bankAppLink(
 
 export const isMobile = (ua: string): boolean => /Android|iPhone|iPad|iPod/i.test(ua);
 
+export const isIos = (ua: string): boolean => /iPhone|iPad|iPod/i.test(ua);
+
+/** Trang iOS của dl.vietqr.io chứa `const DEEPLINK = '<scheme>://...'` rồi tự chuyển hướng bằng JS. */
+export function extractIosDeeplink(html: string): string | null {
+  const m = html.match(/const DEEPLINK = '([a-z][a-z0-9+.-]*:\/\/[^'\\]*)'/i);
+  if (!m || /^(javascript|data|https?):/i.test(m[1])) return null;
+  return m[1];
+}
+
+export async function resolveIosDeeplink(link: string, signal?: AbortSignal): Promise<string | null> {
+  try {
+    const res = await fetch(link, { signal });
+    if (!res.ok) return null;
+    return extractIosDeeplink(await res.text());
+  } catch {
+    return null;
+  }
+}
+
 export function bankAppsForPlatform(ua: string): BankApp[] {
-  const list: BankApp[] = /iPhone|iPad|iPod/i.test(ua) ? iosApps : androidApps;
+  const list: BankApp[] = isIos(ua) ? iosApps : androidApps;
   return [...list].sort(
     (a, b) =>
       Number(b.autofill) - Number(a.autofill) ||

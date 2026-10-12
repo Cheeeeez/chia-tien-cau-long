@@ -1,4 +1,4 @@
-import { useState } from 'preact/hooks';
+import { useEffect, useState } from 'preact/hooks';
 import { copyText } from '../lib/clipboard';
 import { formatVnd } from '../lib/money';
 import { loadBankApp, saveBankApp } from '../lib/storage';
@@ -8,8 +8,10 @@ import {
   bankAppLink,
   bankAppsForPlatform,
   findBank,
+  isIos,
   isMobile,
   qrImageUrl,
+  resolveIosDeeplink,
   transferNote,
 } from '../lib/vietqr';
 
@@ -43,6 +45,36 @@ export function PayCard({ bill, t, baseUrl }: { bill: Bill; t: Transfer; baseUrl
     if (saved && apps.some((a) => a.appId === saved)) return saved;
     return apps.find((a) => a.autofill)?.appId ?? apps[0]?.appId ?? '';
   });
+  const note = transferNote(bill.d, bill.p[t.from].n);
+  const app = apps.find((a) => a.appId === appId);
+  const link = bank && app ? bankAppLink(app.appId, bank, t.amount, note, baseUrl) : null;
+  const ios = isIos(ua);
+  const [direct, setDirect] = useState<{ from: string; href: string } | null>(null);
+
+  // iOS: dl.vietqr.io chỉ trả trang tự chuyển hướng bằng JS (webview như Messenger hay chặn),
+  // nên lấy sẵn deeplink thật để cú bấm của người dùng mở app trực tiếp.
+  useEffect(() => {
+    if (!ios || !link) return;
+    let ctrl = new AbortController();
+    const run = () => {
+      ctrl.abort();
+      const c = (ctrl = new AbortController());
+      resolveIosDeeplink(link, c.signal).then((href) => {
+        if (!c.signal.aborted) setDirect(href ? { from: link, href } : null);
+      });
+    };
+    // Chữ ký deeplink có timestamp nên lấy lại mỗi khi trang hiện lại.
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') run();
+    };
+    run();
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      ctrl.abort();
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [ios, link]);
+  const href = direct && direct.from === link ? direct.href : link;
 
   if (!bank) {
     return (
@@ -55,10 +87,7 @@ export function PayCard({ bill, t, baseUrl }: { bill: Bill; t: Transfer; baseUrl
     );
   }
 
-  const note = transferNote(bill.d, bill.p[t.from].n);
   const qrUrl = qrImageUrl(bank, t.amount, note);
-  const app = apps.find((a) => a.appId === appId);
-  const link = app ? bankAppLink(app.appId, bank, t.amount, note, baseUrl) : null;
 
   return (
     <div class="card">
@@ -93,8 +122,8 @@ export function PayCard({ bill, t, baseUrl }: { bill: Bill; t: Transfer; baseUrl
               ))}
             </optgroup>
           </select>
-          {link && app && (
-            <a class="btn" href={link}>
+          {href && app && (
+            <a class="btn" href={href}>
               Mở {app.appName}
             </a>
           )}

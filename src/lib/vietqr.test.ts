@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bankAppLink, bankAppsForPlatform, qrImageUrl, transferNote } from './vietqr';
+import { bankAppLink, bankAppsForPlatform, extractIosDeeplink, qrImageUrl, transferNote } from './vietqr';
 
 const bank = { bin: '970422', accountNo: '0123456789', accountName: 'NGUYEN VAN A' };
 
@@ -31,5 +31,29 @@ describe('vietqr', () => {
     const firstNon = apps.findIndex((a) => !a.autofill);
     expect(apps.slice(0, firstNon).every((a) => a.autofill)).toBe(true);
     expect(apps.slice(firstNon).some((a) => a.autofill)).toBe(false);
+  });
+});
+
+describe('extractIosDeeplink', () => {
+  it('lấy deeplink đã ký từ trang iOS của dl.vietqr.io', () => {
+    const html = `<script nonce='x'>
+        const DEEPLINK = 'mbbank://applink?targetPage=QRPay&source=Casso&qrContent=000201&callbackurl=https%3A%2F%2Fx.github.io%2F&timestamp=1&signature=a%2Bb%3D';
+        const STORE_URL = 'https://apps.apple.com/vn/app/mb-bank/id1205807363';`;
+    expect(extractIosDeeplink(html)).toBe(
+      'mbbank://applink?targetPage=QRPay&source=Casso&qrContent=000201&callbackurl=https%3A%2F%2Fx.github.io%2F&timestamp=1&signature=a%2Bb%3D',
+    );
+  });
+
+  it('nhận scheme trần của app không tự điền', () => {
+    expect(extractIosDeeplink(`const DEEPLINK = 'vietcombankmobile://';`)).toBe('vietcombankmobile://');
+  });
+
+  it.each([
+    ['không có DEEPLINK', '{"message":"invalid accountName! mb"}'],
+    ['https', `const DEEPLINK = 'https://apps.apple.com/x';`],
+    ['javascript', `const DEEPLINK = 'javascript://alert(1)';`],
+    ['chuỗi JS có escape', `const DEEPLINK = 'mbbank://a\\'b';`],
+  ])('trả null: %s', (_name, html) => {
+    expect(extractIosDeeplink(html)).toBeNull();
   });
 });
