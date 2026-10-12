@@ -4,6 +4,9 @@ import './styles.css';
 
 render(<App />, document.getElementById('app')!);
 
+// iOS Safari bỏ qua user-scalable=no; cử chỉ pinch của WebKit chỉ chặn được qua sự kiện này.
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+
 // Service worker chỉ có trong bản build (plugin `service-worker` trong vite.config.ts).
 if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {

@@ -8,6 +8,7 @@
   --error: #c0262d;
 }
 * { box-sizing: border-box; }
+html, body { touch-action: pan-x pan-y; } /* chặn pinch-zoom và double-tap zoom, vẫn cuộn được */
 body {
   margin: 0;
   background: var(--bg);
