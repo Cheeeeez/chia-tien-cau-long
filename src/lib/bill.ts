@@ -1,5 +1,5 @@
 import { settle } from './split';
-import type { Bill, BillPerson, Draft, Member } from './types';
+import type { Bill, BillPerson, Debt, Draft, Member } from './types';
 
 const BAD = 'Link chia tiền không hợp lệ';
 
@@ -60,6 +60,23 @@ function assertBill(x: unknown): asserts x is Bill {
     if (!isInt(q.u, 1, 100_000_000)) fail();
     if (!isInt(q.by, 0, (o.p as unknown[]).length - 1)) fail();
   }
+  const last = (o.p as unknown[]).length - 1;
+  if (o.a !== undefined) {
+    if (!Array.isArray(o.a) || o.a.length > 60) fail();
+    for (const c of o.a as unknown[]) {
+      if (!Array.isArray(c) || c.length !== 4) return fail();
+      if (!isInt(c[0], 0, last) || !isInt(c[1], 0, last) || c[0] === c[1]) fail();
+      if (!isInt(c[2], 1, 100_000_000)) fail();
+      if (typeof c[3] !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(c[3])) fail();
+    }
+  }
+  if (o.k !== undefined) {
+    if (!Array.isArray(o.k) || o.k.length > 60) fail();
+    for (const c of o.k as unknown[]) {
+      if (!Array.isArray(c) || c.length !== 2) return fail();
+      if (!isInt(c[0], 0, last) || !isInt(c[1], 0, last) || c[0] === c[1]) fail();
+    }
+  }
 }
 
 export function decodeBill(s: string): Bill {
@@ -75,18 +92,37 @@ export function decodeBill(s: string): Bill {
 
 export const billUrl = (base: string, bill: Bill): string => `${base}?b=${encodeBill(bill)}`;
 
-export function draftToBill(roster: Member[], draft: Draft): Bill {
+export const deferKey = (fromId: string, toId: string): string => `${fromId}>${toId}`;
+
+/** Member id theo thứ tự `bill.p`: người được tick (theo roster), rồi người ứng khoản chi hợp lệ chưa có trong danh sách. */
+export function participantIds(roster: Member[], draft: Draft): string[] {
+  const byId = new Map(roster.map((m) => [m.id, m]));
+  const payerIds = new Set(
+    draft.expenses.filter((x) => x.qty > 0 && x.unitPrice > 0 && byId.has(x.payerId)).map((x) => x.payerId),
+  );
+  const ids: string[] = roster.filter((m) => draft.weights[m.id] !== undefined).map((m) => m.id);
+  for (const m of roster) if (payerIds.has(m.id) && !ids.includes(m.id)) ids.push(m.id);
+  return ids;
+}
+
+/** Các khoản nợ mà cả hai người đều có trong bill. */
+export function appliedDebts(roster: Member[], draft: Draft, debts: Debt[]): Debt[] {
+  const ids = new Set(participantIds(roster, draft));
+  return debts.filter((d) => d.from !== d.to && ids.has(d.from) && ids.has(d.to));
+}
+
+export function draftToBill(roster: Member[], draft: Draft, debts: Debt[]): Bill {
   const byId = new Map(roster.map((m) => [m.id, m]));
   const valid = draft.expenses.filter((x) => x.qty > 0 && x.unitPrice > 0 && byId.has(x.payerId));
   const payerIds = new Set(valid.map((x) => x.payerId));
-
-  const ids: string[] = roster.filter((m) => draft.weights[m.id] !== undefined).map((m) => m.id);
-  for (const m of roster) if (payerIds.has(m.id) && !ids.includes(m.id)) ids.push(m.id);
+  const ids = participantIds(roster, draft);
+  const applied = appliedDebts(roster, draft, debts);
+  const receivers = new Set(applied.map((d) => d.to));
 
   const p: BillPerson[] = ids.map((id) => {
     const m = byId.get(id)!;
     const person: BillPerson = { n: m.name.trim().slice(0, 40), w: draft.weights[id] ?? 0 };
-    if (payerIds.has(id) && m.bank) {
+    if ((payerIds.has(id) || receivers.has(id)) && m.bank) {
       person.b = [m.bank.bin, m.bank.accountNo, m.bank.accountName];
     }
     return person;
@@ -98,10 +134,21 @@ export function draftToBill(roster: Member[], draft: Draft): Bill {
     u: x.unitPrice,
     by: ids.indexOf(x.payerId),
   }));
-  return { v: 1, d: draft.date, p, e };
+  const bill: Bill = { v: 1, d: draft.date, p, e };
+  if (applied.length > 0) {
+    bill.a = applied.map((d) => [ids.indexOf(d.from), ids.indexOf(d.to), d.amount, d.date]);
+  }
+  // findHub cần bill.e[0].
+  if (draft.defer.length > 0 && e.length > 0) {
+    const k = settle(bill)
+      .transfers.filter((t) => draft.defer.includes(deferKey(ids[t.from], ids[t.to])))
+      .map((t): [number, number] => [t.from, t.to]);
+    if (k.length > 0) bill.k = k;
+  }
+  return bill;
 }
 
-export function validateDraft(roster: Member[], draft: Draft): string[] {
+export function validateDraft(roster: Member[], draft: Draft, debts: Debt[]): string[] {
   const errors: string[] = [];
   const priced = draft.expenses.filter((x) => x.qty > 0 && x.unitPrice > 0);
   if (priced.length === 0) errors.push('Chưa có khoản chi nào');
@@ -113,12 +160,12 @@ export function validateDraft(roster: Member[], draft: Draft): string[] {
   if (!roster.some((m) => draft.weights[m.id] !== undefined)) errors.push('Chưa chọn người đi');
   if (errors.length > 0) return errors;
 
-  const bill = draftToBill(roster, draft);
+  const bill = draftToBill(roster, draft, debts);
   const s = settle(bill);
   const missing = new Set<number>();
   for (const t of s.transfers) if (!bill.p[t.to].b) missing.add(t.to);
   for (const i of [...missing].sort((x, y) => x - y)) {
-    errors.push(`${bill.p[i].n} ứng tiền nhưng chưa có thông tin ngân hàng`);
+    errors.push(`${bill.p[i].n} cần nhận tiền nhưng chưa có thông tin ngân hàng`);
   }
   return errors;
 }

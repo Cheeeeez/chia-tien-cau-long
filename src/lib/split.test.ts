@@ -94,4 +94,33 @@ describe('settle', () => {
     const s = invariants(mk([1], [['sân', 1, 100000, 0]]));
     expect(s.transfers).toEqual([]);
   });
+
+  it('nợ cũ cộng vào số dư của người nợ', () => {
+    const b = { ...mk([1, 1, 1], [['sân', 1, 300000, 0]]), a: [[1, 0, 5000, '2026-10-05']] satisfies Bill['a'] };
+    const s = invariants(b);
+    expect(s.shares).toEqual([100000, 100000, 100000]);
+    expect(s.transfers.map((t) => [names[t.from], names[t.to], t.amount])).toEqual([
+      ['B', 'A', 105000],
+      ['C', 'A', 100000],
+    ]);
+  });
+
+  it('nợ tới người không phải hub thì người nợ trả hub thêm, hub trả lại người đó', () => {
+    const b = { ...mk([1, 1, 1], [['sân', 1, 300000, 0]]), a: [[1, 2, 5000, '2026-10-05']] satisfies Bill['a'] };
+    const s = invariants(b);
+    expect(s.transfers.map((t) => [names[t.from], names[t.to], t.amount])).toEqual([
+      ['B', 'A', 105000],
+      ['C', 'A', 95000],
+    ]);
+  });
+
+  it('khoản để lần sau (k) tách khỏi transfers sang deferred', () => {
+    const b = { ...mk([1, 1, 1, 0.5], [['Tiền sân', 1, 300000, 0], ['Tiền cầu', 4, 25000, 1]]), k: [[1, 0]] satisfies Bill['k'] };
+    const s = invariants(b);
+    expect(s.transfers.map((t) => [names[t.from], names[t.to], t.amount])).toEqual([
+      ['C', 'A', 115000],
+      ['D', 'A', 58000],
+    ]);
+    expect(s.deferred.map((t) => [names[t.from], names[t.to], t.amount])).toEqual([['B', 'A', 15000]]);
+  });
 });

@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'preact/hooks';
-import { billUrl, draftToBill, validateDraft } from '../lib/bill';
+import { appliedDebts, billUrl, deferKey, draftToBill, participantIds, validateDraft } from '../lib/bill';
 import { shortenUrl } from '../lib/shorten';
 import { copyText } from '../lib/clipboard';
+import { MANUAL, commitBill, openDebts } from '../lib/debts';
 import { buildMessage } from '../lib/message';
 import { expenseAmount, formatVnd } from '../lib/money';
 import { settle } from '../lib/split';
-import { loadRoster, saveRoster } from '../lib/storage';
-import type { Draft, DraftExpense, Member } from '../lib/types';
+import { loadDebts, loadRoster, saveDebts, saveRoster } from '../lib/storage';
+import type { Debt, Draft, DraftExpense, Member } from '../lib/types';
+import { DebtsEditor } from './DebtsEditor';
 import { InstallButton } from './InstallButton';
 import { RosterEditor } from './RosterEditor';
 import { SettlementView } from './SettlementView';
@@ -59,18 +61,24 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
     date: today(),
     expenses: [newExpense('Tiền sân'), newExpense('Tiền cầu', SHUTTLE_PRICE)],
     weights: {},
+    defer: [],
   }));
   const [feedback, setFeedback] = useState('');
+  const [ledger, setLedger] = useState<Debt[]>(loadDebts);
+  const [session] = useState(() => crypto.randomUUID());
 
   useEffect(() => saveRoster(roster), [roster]);
+  useEffect(() => saveDebts(ledger), [ledger]);
 
   const changeRoster = (next: Member[]) => {
     const ids = new Set(next.map((m) => m.id));
     setRoster(next);
+    setLedger((l) => l.filter((d) => ids.has(d.from) && ids.has(d.to)));
     setDraft((d) => ({
       ...d,
       weights: Object.fromEntries(Object.entries(d.weights).filter(([id]) => ids.has(id))),
       expenses: d.expenses.map((x) => (x.payerId && !ids.has(x.payerId) ? { ...x, payerId: '' } : x)),
+      defer: d.defer.filter((key) => key.split('>').every((id) => ids.has(id))),
     }));
   };
 
@@ -92,25 +100,47 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
     setTimeout(() => setFeedback(''), 2000);
   };
 
-  const errors = validateDraft(roster, draft);
+  const open = openDebts(ledger, session);
+  const applied = appliedDebts(roster, draft, open);
+  const ids = participantIds(roster, draft);
+  const errors = validateDraft(roster, draft, open);
   let result = null;
   let url = '';
   if (errors.length === 0) {
-    const bill = draftToBill(roster, draft);
+    const bill = draftToBill(roster, draft, open);
     const s = settle(bill);
     url = billUrl(baseUrl, bill);
+    const commit = () =>
+      setLedger((l) =>
+        commitBill(
+          l,
+          session,
+          applied.map((d) => d.id),
+          s.deferred.map((t) => ({ from: ids[t.from], to: ids[t.to], amount: t.amount, date: draft.date })),
+        ),
+      );
     // Đã rút gọn sẵn (xem useEffect bên dưới) nên await trả về ngay, giữ nguyên thao tác người dùng cho navigator.share.
+    // commit() chạy trước mọi await.
     const share = async () => {
+      commit();
       const link = await shortenUrl(url);
       await navigator.share({ text: buildMessage(bill, s, link) }).catch(() => {});
     };
     const copy = async (build: (link: string) => string) => {
+      commit();
       const link = await shortenUrl(url);
       await flash(build(link), link === url);
     };
     result = (
       <>
-        <SettlementView bill={bill} s={s} />
+        <SettlementView
+          bill={bill}
+          s={s}
+          onDefer={(t, on) => {
+            const key = deferKey(ids[t.from], ids[t.to]);
+            setDraft((d) => ({ ...d, defer: on ? [...d.defer, key] : d.defer.filter((x) => x !== key) }));
+          }}
+        />
         <div class="row-actions wrap">
           {typeof navigator.share === 'function' && (
             <button
@@ -125,6 +155,9 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
           <button type="button" onClick={() => copy((link) => link)}>Copy link</button>
           <a class="btn" href={url} target="_blank" rel="noreferrer">Mở link</a>
         </div>
+        {(applied.length > 0 || s.deferred.length > 0) && (
+          <p class="hint">Khoản “Để lần sau” và “Nợ lần trước” được lưu khi bấm Chia sẻ hoặc Copy.</p>
+        )}
         {feedback && <p class="hint" role="status">{feedback}</p>}
       </>
     );
@@ -258,6 +291,19 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
             </li>
           ))}
         </ul>
+      </section>
+
+      <section>
+        <h2>Nợ lần trước</h2>
+        <DebtsEditor
+          roster={roster}
+          debts={open}
+          applied={new Set(applied.map((d) => d.id))}
+          onAdd={(d) =>
+            setLedger((l) => [...l, { ...d, id: crypto.randomUUID(), date: today(), src: MANUAL }])
+          }
+          onRemove={(id) => setLedger((l) => l.filter((d) => d.id !== id))}
+        />
       </section>
 
       <section>

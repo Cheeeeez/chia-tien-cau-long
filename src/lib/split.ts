@@ -8,7 +8,8 @@ export type Settlement = {
   shares: number[];
   paid: number[];
   balances: number[];
-  transfers: Transfer[];
+  transfers: Transfer[]; // chuyển ngay
+  deferred: Transfer[]; // để lần sau
 };
 
 /** Người ứng tiền sân: payer của khoản đầu tiên có nhãn chứa "sân"; không có thì payer của khoản đầu tiên. */
@@ -47,6 +48,11 @@ export function settle(bill: Bill): Settlement {
     paid[x.by] += amounts[k];
   });
   const balances = paid.map((p, i) => p - shares[i]);
+  // Nợ cũ cộng vào bill: không đổi shares/paid/total, tổng balances vẫn bằng 0.
+  for (const [f, t, amt] of bill.a ?? []) {
+    balances[f] -= amt;
+    balances[t] += amt;
+  }
 
   // Chỉ chuyển cho / nhận từ người ứng tiền sân (hub); người ứng tiền cầu được hub trả lại nếu dư.
   const hub = findHub(bill);
@@ -55,10 +61,18 @@ export function settle(bill: Bill): Settlement {
   const others = balances.map((_, i) => i).filter((i) => i !== hub);
   const debtors = others.filter((i) => balances[i] < 0).sort(byAbsDesc);
   const creditors = others.filter((i) => balances[i] > 0).sort(byAbsDesc);
-  const transfers: Transfer[] = [
+  const all: Transfer[] = [
     ...debtors.map((i) => ({ from: i, to: hub, exact: -balances[i], amount: roundUpThousand(-balances[i]) })),
     ...creditors.map((i) => ({ from: hub, to: i, exact: balances[i], amount: roundUpThousand(balances[i]) })),
   ];
 
-  return { total, shares, paid, balances, transfers };
+  const isDeferred = (t: Transfer) => (bill.k ?? []).some(([f, to]) => f === t.from && to === t.to);
+  return {
+    total,
+    shares,
+    paid,
+    balances,
+    transfers: all.filter((t) => !isDeferred(t)),
+    deferred: all.filter(isDeferred),
+  };
 }

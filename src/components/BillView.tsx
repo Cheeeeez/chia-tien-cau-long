@@ -1,4 +1,5 @@
 import { useState } from 'preact/hooks';
+import { transferLine } from '../lib/message';
 import { formatVnd } from '../lib/money';
 import { settle } from '../lib/split';
 import { formatDate } from '../lib/text';
@@ -11,6 +12,7 @@ export function BillView({ bill, baseUrl }: { bill: Bill; baseUrl: string }) {
   const [me, setMe] = useState(-1);
   const outgoing = s.transfers.filter((t) => t.from === me);
   const incoming = s.transfers.filter((t) => t.to === me);
+  const later = s.deferred.filter((t) => t.from === me || t.to === me);
 
   return (
     <main>
@@ -36,7 +38,12 @@ export function BillView({ bill, baseUrl }: { bill: Bill; baseUrl: string }) {
               {incoming.map((t) => bill.p[t.from].n).join(', ')}
             </p>
           )}
-          {outgoing.length === 0 && incoming.length === 0 && <p class="card">Bạn không cần chuyển khoản.</p>}
+          {later.length > 0 && (
+            <p class="card">Để lần sau: {later.map((t) => transferLine(bill, t)).join(', ')}</p>
+          )}
+          {outgoing.length === 0 && incoming.length === 0 && later.length === 0 && (
+            <p class="card">Bạn không cần chuyển khoản.</p>
+          )}
         </>
       )}
     </main>
