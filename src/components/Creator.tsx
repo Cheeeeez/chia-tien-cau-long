@@ -53,6 +53,7 @@ function WeightInput({ value, onCommit }: { value: number; onCommit: (w: number)
 
 export function Creator({ baseUrl }: { baseUrl: string }) {
   const [roster, setRoster] = useState<Member[]>(loadRoster);
+  const [rosterOpen, setRosterOpen] = useState(true);
   const [draft, setDraft] = useState<Draft>(() => ({
     date: today(),
     expenses: [newExpense('Tiền sân'), newExpense('Tiền cầu', SHUTTLE_PRICE)],
@@ -120,8 +121,21 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
       <InstallButton />
 
       <section>
-        <h2>Thành viên</h2>
-        <RosterEditor roster={roster} onChange={changeRoster} />
+        <h2>
+          <button
+            type="button"
+            class="collapse-toggle"
+            aria-expanded={rosterOpen}
+            onClick={() => setRosterOpen((v) => !v)}
+          >
+            <span>Thành viên <span class="muted">({roster.length})</span></span>
+            <span aria-hidden="true">{rosterOpen ? '▾' : '▸'}</span>
+          </button>
+        </h2>
+        {/* Ẩn bằng hidden thay vì gỡ khỏi DOM để form đang nhập dở không bị mất. */}
+        <div hidden={!rosterOpen}>
+          <RosterEditor roster={roster} onChange={changeRoster} />
+        </div>
       </section>
 
       <section>
