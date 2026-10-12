@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { billUrl, draftToBill, validateDraft } from '../lib/bill';
+import { shortenUrl } from '../lib/shorten';
 import { copyText } from '../lib/clipboard';
 import { buildMessage } from '../lib/message';
 import { expenseAmount, formatVnd } from '../lib/money';
@@ -84,36 +85,57 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
       return { ...d, weights };
     });
 
-  const flash = async (text: string) => {
+  // fallbackLong: không rút gọn được (mạng lỗi/quá giới hạn) nên đã dùng link dài.
+  const flash = async (text: string, fallbackLong: boolean) => {
     const ok = await copyText(text);
-    setFeedback(ok ? 'Đã copy' : 'Không copy được, hãy bấm giữ để copy');
+    setFeedback(!ok ? 'Không copy được, hãy bấm giữ để copy' : fallbackLong ? 'Đã copy (link dài, chưa rút gọn được)' : 'Đã copy');
     setTimeout(() => setFeedback(''), 2000);
   };
 
   const errors = validateDraft(roster, draft);
   let result = null;
+  let url = '';
   if (errors.length === 0) {
     const bill = draftToBill(roster, draft);
     const s = settle(bill);
-    const url = billUrl(baseUrl, bill);
-    const msg = buildMessage(bill, s, url);
+    url = billUrl(baseUrl, bill);
+    // Đã rút gọn sẵn (xem useEffect bên dưới) nên await trả về ngay, giữ nguyên thao tác người dùng cho navigator.share.
+    const share = async () => {
+      const link = await shortenUrl(url);
+      await navigator.share({ text: buildMessage(bill, s, link) }).catch(() => {});
+    };
+    const copy = async (build: (link: string) => string) => {
+      const link = await shortenUrl(url);
+      await flash(build(link), link === url);
+    };
     result = (
       <>
         <SettlementView bill={bill} s={s} />
         <div class="row-actions wrap">
           {typeof navigator.share === 'function' && (
-            <button type="button" class="primary" onClick={() => navigator.share({ text: msg }).catch(() => {})}>
+            <button
+              type="button"
+              class="primary"
+              onClick={share}
+            >
               Chia sẻ
             </button>
           )}
-          <button type="button" onClick={() => flash(msg)}>Copy tin nhắn</button>
-          <button type="button" onClick={() => flash(url)}>Copy link</button>
+          <button type="button" onClick={() => copy((link) => buildMessage(bill, s, link))}>Copy tin nhắn</button>
+          <button type="button" onClick={() => copy((link) => link)}>Copy link</button>
           <a class="btn" href={url} target="_blank" rel="noreferrer">Mở link</a>
         </div>
         {feedback && <p class="hint" role="status">{feedback}</p>}
       </>
     );
   }
+
+  // Rút gọn trước khi người dùng bấm. Chờ 1.5s sau lần sửa cuối để không tốn giới hạn 5 request/phút của dịch vụ.
+  useEffect(() => {
+    if (!url) return;
+    const t = setTimeout(() => void shortenUrl(url), 1500);
+    return () => clearTimeout(t);
+  }, [url]);
 
   return (
     <main>

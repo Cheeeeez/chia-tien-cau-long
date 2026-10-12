@@ -42,19 +42,36 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+const NAV_TIMEOUT_MS = 4000;
+// ignoreVary: server có thể trả `Vary: Origin`; script/style `crossorigin` gửi Origin còn lúc precache thì không.
+const lookup = (key) =>
+  caches
+    .open(CACHE)
+    .then((c) => c.match(key, { ignoreVary: true }))
+    .then((r) => r || caches.match(key, { ignoreVary: true })); // bản trước còn giữ
+
+// Trang: ưu tiên mạng để deploy xong là thấy ngay bản mới (index.html trỏ tới asset băm tên mới, asset chưa có trong
+// cache thì SW tải từ mạng). Mất mạng / mạng chậm quá NAV_TIMEOUT_MS / server lỗi thì dùng bản đã cache.
+// cache: 'no-cache' bỏ qua max-age=600 của GitHub Pages nhưng vẫn chỉ tốn một lần 304 khi không đổi.
+function navigate() {
+  const timeout = new Promise((_, reject) => setTimeout(reject, NAV_TIMEOUT_MS));
+  return Promise.race([fetch(SHELL, { cache: 'no-cache' }), timeout])
+    .then((r) => {
+      if (!r.ok) throw new Error(String(r.status));
+      return r;
+    })
+    .catch(() => lookup(SHELL).then((r) => r || fetch(SHELL)));
+}
+
 self.addEventListener('fetch', (e) => {
   const req = e.request;
   // Không chặn request khác origin (img.vietqr.io, dl.vietqr.io): luôn đi mạng như cũ.
   if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
-  // ignoreVary: server có thể trả `Vary: Origin`; script/style `crossorigin` gửi Origin còn lúc precache thì không.
-  const opts = { ignoreVary: true };
-  // Mọi trang (kể cả ?b=...) đều là cùng một index.html: trả bản đã cache để mở tức thì / khi mất mạng.
-  const key = req.mode === 'navigate' ? SHELL : req;
-  e.respondWith(
-    caches
-      .open(CACHE)
-      .then((c) => c.match(key, opts))
-      .then((r) => r || caches.match(key, opts)) // bản trước còn giữ
-      .then((r) => r || fetch(req)),
-  );
+  // Mọi trang (kể cả ?b=...) đều là cùng một index.html.
+  if (req.mode === 'navigate') {
+    e.respondWith(navigate());
+    return;
+  }
+  // Asset có băm trong tên: cache trước, mạng sau.
+  e.respondWith(lookup(req).then((r) => r || fetch(req)));
 });
