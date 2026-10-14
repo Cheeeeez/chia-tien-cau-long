@@ -56,7 +56,7 @@ function WeightInput({ value, onCommit }: { value: number; onCommit: (w: number)
 
 export function Creator({ baseUrl }: { baseUrl: string }) {
   const [roster, setRoster] = useState<Member[]>(loadRoster);
-  const [rosterOpen, setRosterOpen] = useState(true);
+  const [rosterOpen, setRosterOpen] = useState(false);
   const [draft, setDraft] = useState<Draft>(() => ({
     date: today(),
     expenses: [newExpense('Tiền sân'), newExpense('Tiền cầu', SHUTTLE_PRICE)],
