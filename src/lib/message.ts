@@ -25,7 +25,7 @@ export function buildMessage(bill: Bill, s: Settlement, url: string): string {
     lines.push('Nợ lần trước:');
     for (const c of bill.a) lines.push(`- ${carryLine(bill, c)}`);
   }
-  const players = bill.p.filter((p) => p.w > 0).length;
+  const players = bill.p.filter((p) => p.w > 0 || p.g).length;
   lines.push(`${players} người chơi, số tiền chuyển đã làm tròn lên 1.000đ.`);
   if (s.transfers.length === 0) {
     lines.push('Không ai cần chuyển khoản.');

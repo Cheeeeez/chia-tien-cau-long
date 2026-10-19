@@ -29,17 +29,19 @@ function today(): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
 }
 
-const validWeight = (w: number) => Number.isFinite(w) && w >= 0.5 && w <= 10 && Number.isInteger(w * 2);
+const validWeight = (w: number) => Number.isFinite(w) && w >= 0 && w <= 10 && Number.isInteger(w * 2);
 
 function WeightInput({ value, onCommit }: { value: number; onCommit: (w: number) => void }) {
   const [text, setText] = useState(String(value));
+  // Nút "Đi cùng"/"Chia tiền" đổi value từ ngoài; đồng bộ lại ô nhập (không đè khi đang gõ giá trị tương đương).
+  useEffect(() => setText((t) => (Number(t) === value && t !== '' ? t : String(value))), [value]);
   return (
     <label class="weight">
       Suất
       <input
         type="number"
         step="0.5"
-        min="0.5"
+        min="0"
         max="10"
         value={text}
         onInput={(e) => {
@@ -84,6 +86,9 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
 
   const patchExpense = (key: string, patch: Partial<DraftExpense>) =>
     setDraft((d) => ({ ...d, expenses: d.expenses.map((x) => (x.key === key ? { ...x, ...patch } : x)) }));
+
+  const setWeight = (id: string, w: number) =>
+    setDraft((d) => ({ ...d, weights: { ...d.weights, [id]: w } }));
 
   const toggle = (id: string, on: boolean) =>
     setDraft((d) => {
@@ -271,7 +276,7 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
 
       <section>
         <h2>Ai đi hôm nay</h2>
-        <ul class="list">
+        <ul class="list who">
           {roster.map((m) => (
             <li key={m.id}>
               <label class="check">
@@ -282,11 +287,19 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
                 />
                 {m.name}
               </label>
-              {draft.weights[m.id] !== undefined && (
-                <WeightInput
-                  value={draft.weights[m.id]}
-                  onCommit={(w) => setDraft((d) => ({ ...d, weights: { ...d.weights, [m.id]: w } }))}
-                />
+              {draft.weights[m.id] === undefined ? (
+                <button type="button" class="neutral" onClick={() => setWeight(m.id, 0)}>
+                  + Đi cùng
+                </button>
+              ) : (
+                <>
+                  <WeightInput value={draft.weights[m.id]} onCommit={(w) => setWeight(m.id, w)} />
+                  {draft.weights[m.id] === 0 ? (
+                    <button type="button" onClick={() => setWeight(m.id, 1)}>Chia tiền</button>
+                  ) : (
+                    <button type="button" class="neutral" onClick={() => setWeight(m.id, 0)}>Đi cùng</button>
+                  )}
+                </>
               )}
             </li>
           ))}

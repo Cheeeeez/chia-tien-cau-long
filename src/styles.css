@@ -29,6 +29,11 @@ ul.list > li {
   display: flex; align-items: center; justify-content: space-between; gap: 8px;
   padding: 8px 0; border-bottom: 1px solid var(--border);
 }
+/* Danh sách "Ai đi": 3 cột cố định để ô Suất và nút thẳng hàng giữa các dòng. */
+ul.who > li { display: grid; grid-template-columns: minmax(0, 1fr) 120px 104px; }
+ul.who .weight { justify-self: end; }
+ul.who > li > button { grid-column: 3; padding: 8px 4px; white-space: nowrap; }
+ul.who input[type='checkbox'] { flex-shrink: 0; }
 button, .btn, input, select {
   font: inherit; min-height: 44px; border-radius: 8px; border: 1px solid var(--border);
   padding: 8px 12px; background: var(--card); color: var(--fg);

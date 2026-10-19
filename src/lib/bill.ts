@@ -43,6 +43,7 @@ function assertBill(x: unknown): asserts x is Bill {
     if (typeof q.w !== 'number' || !Number.isFinite(q.w) || q.w < 0 || q.w > 10) fail();
     if (!Number.isInteger((q.w as number) * 2)) fail();
     sumW += q.w as number;
+    if (q.g !== undefined && (q.g !== 1 || q.w !== 0)) fail();
     if (q.b !== undefined) {
       const b = q.b;
       if (!Array.isArray(b) || b.length !== 3) return fail();
@@ -122,6 +123,7 @@ export function draftToBill(roster: Member[], draft: Draft, debts: Debt[]): Bill
   const p: BillPerson[] = ids.map((id) => {
     const m = byId.get(id)!;
     const person: BillPerson = { n: m.name.trim().slice(0, 40), w: draft.weights[id] ?? 0 };
+    if (draft.weights[id] === 0) person.g = 1;
     if ((payerIds.has(id) || receivers.has(id)) && m.bank) {
       person.b = [m.bank.bin, m.bank.accountNo, m.bank.accountName];
     }
@@ -158,6 +160,7 @@ export function validateDraft(roster: Member[], draft: Draft, debts: Debt[]): st
     }
   }
   if (!roster.some((m) => draft.weights[m.id] !== undefined)) errors.push('Chưa chọn người đi');
+  else if (!roster.some((m) => (draft.weights[m.id] ?? 0) > 0)) errors.push('Cần ít nhất một người có suất lớn hơn 0');
   if (errors.length > 0) return errors;
 
   const bill = draftToBill(roster, draft, debts);

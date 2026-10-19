@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { decodeBill, deferKey, draftToBill, encodeBill, validateDraft } from './bill';
+import { buildMessage } from './message';
+import { settle } from './split';
 import type { Bill, Debt, Draft, Member } from './types';
 
 const bill: Bill = {
@@ -122,5 +124,24 @@ describe('validateDraft', () => {
         [],
       ),
     ).toEqual(['Khoản "Tiền cầu" chưa chọn người trả']);
+  });
+
+  it('cho phép suất 0 nhưng phải có ít nhất một người suất > 0', () => {
+    expect(validateDraft(roster(true), draft({ weights: { a: 1, b: 1, c: 0 } }), [])).toEqual([]);
+    expect(validateDraft(roster(true), draft({ weights: { b: 0, c: 0 } }), [])).toEqual([
+      'Cần ít nhất một người có suất lớn hơn 0',
+    ]);
+  });
+
+  it('đi cùng (suất 0 được tick) đánh dấu g, người chỉ ứng tiền thì không', () => {
+    const b = draftToBill(roster(true), draft({ weights: { b: 1, c: 0 } }), []);
+    expect(b.p.map((p) => [p.n, p.w, p.g])).toEqual([
+      ['Bình', 1, undefined],
+      ['Chi', 0, 1],
+      ['An', 0, undefined],
+    ]);
+    expect(decodeBill(encodeBill(b))).toEqual(b);
+    expect(() => decodeBill(encodeBill({ ...b, p: [{ ...b.p[0], g: 1 }, ...b.p.slice(1)] }))).toThrow();
+    expect(buildMessage(b, settle(b), 'u')).toContain('2 người chơi');
   });
 });

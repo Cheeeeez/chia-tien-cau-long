@@ -1,7 +1,8 @@
 export type BankInfo = { bin: string; accountNo: string; accountName: string };
 export type Member = { id: string; name: string; bank: BankInfo | null };
 // Payload nằm trong link (v1); dùng key ngắn để link gọn
-export type BillPerson = { n: string; w: number; b?: [bin: string, accountNo: string, accountName: string] };
+/** w: suất; g: 1 = có đi nhưng suất 0 (đi cùng). Suất 0 không có g = chỉ ứng tiền, không đi. */
+export type BillPerson = { n: string; w: number; g?: 1; b?: [bin: string, accountNo: string, accountName: string] };
 export type BillExpense = { l: string; q: number; u: number; by: number }; // label, số lượng, đơn giá (VND, nguyên), index người trả trong p
 /** Nợ cộng vào bill: p[from] nợ p[to] `amount` đồng, phát sinh ngày `date` (YYYY-MM-DD). */
 export type BillCarry = [from: number, to: number, amount: number, date: string];
