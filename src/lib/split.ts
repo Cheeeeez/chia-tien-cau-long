@@ -18,30 +18,45 @@ export function findHub(bill: Bill): number {
   return (court ?? bill.e[0]).by;
 }
 
+/** Chia `amount` cho `members` (index tăng dần, units > 0) theo phần dư lớn nhất, cộng dồn vào `shares`. */
+function allocate(amount: number, members: number[], units: number[], shares: number[]): void {
+  const U = members.reduce((a, i) => a + units[i], 0);
+  if (U === 0) return;
+  const rems: number[] = [];
+  let given = 0;
+  for (const i of members) {
+    const raw = amount * units[i];
+    const base = Math.floor(raw / U);
+    shares[i] += base;
+    given += base;
+    rems.push(raw % U);
+  }
+  let leftover = amount - given;
+  const order = rems.map((_, j) => j).sort((a, b) => rems[b] - rems[a] || a - b);
+  for (const j of order) {
+    if (leftover <= 0) break;
+    shares[members[j]] += 1;
+    leftover -= 1;
+  }
+}
+
 export function settle(bill: Bill): Settlement {
   const n = bill.p.length;
   const amounts = bill.e.map((x) => expenseAmount(x.q, x.u));
   const total = amounts.reduce((a, b) => a + b, 0);
 
-  // Chia theo hệ số, phần dư lớn nhất; toàn bộ là số nguyên đồng.
+  // Gộp các khoản cùng nhóm người chia (chỉ tính người có suất > 0), mỗi nhóm chia theo hệ số và phần dư lớn nhất; toàn bộ là số nguyên đồng.
   const units = bill.p.map((x) => Math.round(x.w * 2));
-  const U = units.reduce((a, b) => a + b, 0);
   const shares = new Array<number>(n).fill(0);
-  if (U > 0) {
-    const rems: number[] = [];
-    for (let i = 0; i < n; i++) {
-      const raw = total * units[i];
-      shares[i] = Math.floor(raw / U);
-      rems.push(raw % U);
-    }
-    let leftover = total - shares.reduce((a, b) => a + b, 0);
-    const order = rems.map((_, i) => i).sort((a, b) => rems[b] - rems[a] || a - b);
-    for (const i of order) {
-      if (leftover <= 0) break;
-      shares[i] += 1;
-      leftover -= 1;
-    }
-  }
+  const groups = new Map<string, { members: number[]; amount: number }>();
+  bill.e.forEach((x, k) => {
+    const members = (x.s ?? bill.p.map((_, i) => i)).filter((i) => units[i] > 0);
+    const key = members.join(',');
+    const g = groups.get(key);
+    if (g) g.amount += amounts[k];
+    else groups.set(key, { members, amount: amounts[k] });
+  });
+  for (const g of groups.values()) allocate(g.amount, g.members, units, shares);
 
   const paid = new Array<number>(n).fill(0);
   bill.e.forEach((x, k) => {

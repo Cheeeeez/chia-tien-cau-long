@@ -56,6 +56,62 @@ function WeightInput({ value, onCommit }: { value: number; onCommit: (w: number)
   );
 }
 
+function SharerPicker({ players, sharers, onChange }: {
+  players: Member[];
+  sharers: string[] | undefined;
+  onChange: (sharers: string[] | undefined) => void;
+}) {
+  const all = sharers === undefined;
+  const count = all ? players.length : players.filter((m) => sharers.includes(m.id)).length;
+  return (
+    <div class="sharer-picker">
+      <span class="field-label">Khoản này chia cho ai?</span>
+      <div class="segmented" role="group" aria-label="Chia cho">
+        <button type="button" class={all ? 'primary' : 'neutral'} aria-pressed={all} onClick={() => onChange(undefined)}>
+          Tất cả người đi
+        </button>
+        <button
+          type="button"
+          class={all ? 'neutral' : 'primary'}
+          aria-pressed={!all}
+          disabled={players.length === 0}
+          onClick={() => {
+            if (all) onChange(players.map((m) => m.id));
+          }}
+        >
+          Chọn người
+        </button>
+      </div>
+      {all ? (
+        <span class="hint">
+          {count > 0
+            ? `Mọi người đi hôm nay cùng chia khoản này (${count} người).`
+            : 'Chọn người ở mục "Ai đi hôm nay" để chia riêng từng khoản.'}
+        </span>
+      ) : (
+        <>
+          <div class="sharers">
+            {players.map((m) => (
+              <label class="check" key={m.id}>
+                <input
+                  type="checkbox"
+                  checked={sharers.includes(m.id)}
+                  onChange={(e) => {
+                    const on = (e.currentTarget as HTMLInputElement).checked;
+                    onChange(on ? [...sharers, m.id] : sharers.filter((id) => id !== m.id));
+                  }}
+                />
+                {m.name}
+              </label>
+            ))}
+          </div>
+          <span class="hint">Chỉ {count}/{players.length} người được tick chia khoản này; bỏ tick người không dùng.</span>
+        </>
+      )}
+    </div>
+  );
+}
+
 export function Creator({ baseUrl }: { baseUrl: string }) {
   const [roster, setRoster] = useState<Member[]>(loadRoster);
   const [rosterOpen, setRosterOpen] = useState(false);
@@ -108,6 +164,7 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
   const open = openDebts(ledger, session);
   const applied = appliedDebts(roster, draft, open);
   const ids = participantIds(roster, draft);
+  const players = roster.filter((m) => (draft.weights[m.id] ?? 0) > 0);
   const errors = validateDraft(roster, draft, open);
   let result = null;
   let url = '';
@@ -254,6 +311,7 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
                 <option key={m.id} value={m.id}>{m.name}</option>
               ))}
             </select>
+            <SharerPicker players={players} sharers={x.sharers} onChange={(sharers) => patchExpense(x.key, { sharers })} />
             <div class="row-actions between">
               <strong>{formatVnd(expenseAmount(x.qty, x.unitPrice))}</strong>
               <button

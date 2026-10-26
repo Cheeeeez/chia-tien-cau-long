@@ -3,7 +3,7 @@ export type Member = { id: string; name: string; bank: BankInfo | null };
 // Payload nằm trong link (v1); dùng key ngắn để link gọn
 /** w: suất; g: 1 = có đi nhưng suất 0 (đi cùng). Suất 0 không có g = chỉ ứng tiền, không đi. */
 export type BillPerson = { n: string; w: number; g?: 1; b?: [bin: string, accountNo: string, accountName: string] };
-export type BillExpense = { l: string; q: number; u: number; by: number }; // label, số lượng, đơn giá (VND, nguyên), index người trả trong p
+export type BillExpense = { l: string; q: number; u: number; by: number; s?: number[] }; // label, số lượng, đơn giá (VND, nguyên), index người trả trong p; s: index trong p của những người chia khoản này, tăng dần; không có = mọi người theo suất
 /** Nợ cộng vào bill: p[from] nợ p[to] `amount` đồng, phát sinh ngày `date` (YYYY-MM-DD). */
 export type BillCarry = [from: number, to: number, amount: number, date: string];
 /** a: nợ cũ cộng vào bill; k: các cặp chuyển khoản (from, to) (index trong p) để lần sau. */
@@ -15,7 +15,14 @@ export type Bill = {
   a?: BillCarry[];
   k?: [from: number, to: number][];
 };
-export type DraftExpense = { key: string; label: string; qty: number; unitPrice: number; payerId: string };
+export type DraftExpense = {
+  key: string;
+  label: string;
+  qty: number;
+  unitPrice: number;
+  payerId: string;
+  sharers?: string[]; // memberId của những người chia khoản này; undefined = tất cả người đi
+};
 export type Draft = {
   date: string;
   expenses: DraftExpense[];

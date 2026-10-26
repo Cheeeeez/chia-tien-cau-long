@@ -58,6 +58,14 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .row-actions.wrap { flex-wrap: wrap; margin-top: 12px; }
 .row-actions.between { justify-content: space-between; }
 .check { display: flex; align-items: center; gap: 8px; min-height: 44px; }
+.sharers { display: flex; flex-wrap: wrap; gap: 0 16px; }
+.sharer-picker > * + * { margin-top: 6px; }
+.sharer-picker .field-label { display: block; font-size: 0.85rem; color: var(--muted); }
+.sharer-picker .hint { display: block; }
+.segmented { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+.segmented button { border-radius: 0; }
+.segmented button:first-child { border-radius: 8px 0 0 8px; }
+.segmented button:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
 .weight { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; }
 .weight input { width: 80px; }
 .muted, .hint { color: var(--muted); font-size: 0.9rem; }

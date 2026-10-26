@@ -3,12 +3,12 @@ import { settle } from './split';
 import type { Bill } from './types';
 
 const names = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-function mk(w: number[], e: [l: string, q: number, u: number, by: number][]): Bill {
+function mk(w: number[], e: [l: string, q: number, u: number, by: number, s?: number[]][]): Bill {
   return {
     v: 1,
     d: '2026-10-12',
     p: w.map((x, i) => ({ n: names[i], w: x })),
-    e: e.map(([l, q, u, by]) => ({ l, q, u, by })),
+    e: e.map(([l, q, u, by, s]) => ({ l, q, u, by, ...(s ? { s } : {}) })),
   };
 }
 
@@ -37,6 +37,25 @@ describe('settle', () => {
     expect(s.shares).toEqual([57143, 57143, 57143, 57143, 57143, 57143, 57142]);
     expect(s.transfers).toHaveLength(6);
     expect(s.transfers.every((t) => t.amount === 58000)).toBe(true);
+  });
+
+  it('khoản chỉ chia cho một nhóm người (s)', () => {
+    const s = invariants(
+      mk([1, 1, 1, 1], [['Sân 5:30-7:00', 1.5, 120000, 1], ['Sân 7:00-8:00', 1, 120000, 1, [1, 2, 3]]]),
+    );
+    expect(s.shares).toEqual([45000, 85000, 85000, 85000]);
+    expect(s.transfers.map((t) => [names[t.from], names[t.to], t.amount])).toEqual([
+      ['C', 'B', 85000],
+      ['D', 'B', 85000],
+      ['A', 'B', 45000],
+    ]);
+  });
+
+  it('s trùng toàn bộ người có suất thì chia như không có s', () => {
+    const withS = mk([1, 1, 1, 0], [['sân', 1, 100000, 0], ['cầu', 1, 200, 0, [0, 1, 2]]]);
+    const s = invariants(withS);
+    expect(s.shares).toEqual([33400, 33400, 33400, 0]);
+    expect(s.shares).toEqual(settle({ ...withS, e: withS.e.map(({ s: _s, ...x }) => x) }).shares);
   });
 
   it('chia theo hệ số', () => {

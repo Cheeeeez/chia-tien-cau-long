@@ -7,9 +7,10 @@ export function expenseLine(bill: Bill, i: number): string {
   const x = bill.e[i];
   const amount = expenseAmount(x.q, x.u);
   const payer = bill.p[x.by].n;
+  const who = x.s ? `${payer} ứng, chia cho ${x.s.map((j) => bill.p[j].n).join(', ')}` : `${payer} ứng`;
   return x.q === 1
-    ? `${x.l}: ${formatVnd(amount)} (${payer} ứng)`
-    : `${x.l}: ${x.q} × ${formatVnd(x.u)} = ${formatVnd(amount)} (${payer} ứng)`;
+    ? `${x.l}: ${formatVnd(amount)} (${who})`
+    : `${x.l}: ${x.q} × ${formatVnd(x.u)} = ${formatVnd(amount)} (${who})`;
 }
 
 export const transferLine = (bill: Bill, t: Settlement['transfers'][number]): string =>

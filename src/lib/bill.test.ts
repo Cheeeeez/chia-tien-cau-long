@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { decodeBill, deferKey, draftToBill, encodeBill, validateDraft } from './bill';
-import { buildMessage } from './message';
+import { buildMessage, expenseLine } from './message';
 import { settle } from './split';
 import type { Bill, Debt, Draft, Member } from './types';
 
@@ -41,6 +41,17 @@ describe('encode/decode', () => {
     expect(() => decodeBill(enc({ ...bill, a: [[1, 0, 0, '2026-10-05']] }))).toThrow();
     expect(() => decodeBill(enc({ ...bill, a: [[1, 0, 5000, '12/10']] }))).toThrow();
     expect(() => decodeBill(enc({ ...bill, k: [[1, 2]] }))).toThrow();
+  });
+
+  it('round-trip khoản có s; từ chối s sai', () => {
+    const withS: Bill = { ...bill, e: [...bill.e, { l: 'Sân', q: 1, u: 100000, by: 0, s: [1] }] };
+    expect(decodeBill(encodeBill(withS))).toEqual(withS);
+    for (const s of [[], [1, 0], [0, 0], [2]]) {
+      expect(() => decodeBill(enc({ ...bill, e: [{ ...bill.e[0], s }] }))).toThrow();
+    }
+    expect(() =>
+      decodeBill(enc({ ...bill, p: [bill.p[0], { n: 'Bình', w: 0 }], e: [{ ...bill.e[0], s: [1] }] })),
+    ).toThrow();
   });
 });
 
@@ -99,6 +110,19 @@ describe('draftToBill', () => {
     expect(draftToBill(roster(true), draft({ defer: [deferKey('b', 'a')] }), []).k).toEqual([[0, 2]]);
     expect(draftToBill(roster(true), draft({ defer: [deferKey('a', 'b')] }), []).k).toBeUndefined();
   });
+
+  it('sharers: chỉ giữ người chơi, chọn đủ thì không ghi s', () => {
+    // p = [Bình, Chi, An]; An chỉ ứng
+    const withSharers = (sharers: string[]) => ({
+      expenses: [{ key: '1', label: 'Sân', qty: 1, unitPrice: 300000, payerId: 'a', sharers }],
+    });
+    const b = draftToBill(roster(true), draft(withSharers(['c'])), []);
+    expect(b.e[0].s).toEqual([1]);
+    expect(expenseLine(b, 0).endsWith('(An ứng, chia cho Chi)')).toBe(true);
+    expect(draftToBill(roster(true), draft(withSharers(['c', 'b'])), []).e[0].s).toBeUndefined();
+    expect(draftToBill(roster(true), draft(withSharers(['a', 'c'])), []).e[0].s).toEqual([1]);
+    expect('s' in draftToBill(roster(true), draft(withSharers(['c', 'b'])), []).e[0]).toBe(false);
+  });
 });
 
 describe('validateDraft', () => {
@@ -131,6 +155,15 @@ describe('validateDraft', () => {
     expect(validateDraft(roster(true), draft({ weights: { b: 0, c: 0 } }), [])).toEqual([
       'Cần ít nhất một người có suất lớn hơn 0',
     ]);
+  });
+
+  it('khoản có sharers rỗng hoặc chỉ gồm người không chơi thì báo lỗi', () => {
+    const expenses = (sharers: string[]) => [
+      { key: '1', label: 'Tiền sân', qty: 1, unitPrice: 300000, payerId: 'a', sharers },
+    ];
+    const err = ['Khoản "Tiền sân" chưa chọn người chia'];
+    expect(validateDraft(roster(true), draft({ expenses: expenses([]) }), [])).toEqual(err);
+    expect(validateDraft(roster(true), draft({ expenses: expenses(['a']) }), [])).toEqual(err);
   });
 
   it('đi cùng (suất 0 được tick) đánh dấu g, người chỉ ứng tiền thì không', () => {
