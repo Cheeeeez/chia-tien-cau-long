@@ -22,7 +22,7 @@ describe('vietqr', () => {
 
   it('qrImageUrl', () => {
     expect(qrImageUrl(bank, 58000, 'CAU LONG 1210 NAM')).toBe(
-      'https://img.vietqr.io/image/970422-0123456789-compact2.png?amount=58000&addInfo=CAU%20LONG%201210%20NAM&accountName=NGUYEN%20VAN%20A',
+      'https://img.vietqr.io/image/970422-0123456789-compact2.svg?amount=58000&addInfo=CAU%20LONG%201210%20NAM&accountName=NGUYEN%20VAN%20A',
     );
   });
 

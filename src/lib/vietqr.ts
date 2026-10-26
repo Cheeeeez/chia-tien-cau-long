@@ -19,7 +19,7 @@ export function transferNote(date: string, payerName: string): string {
 }
 
 export const qrImageUrl = (bank: BankInfo, amount: number, note: string): string =>
-  `https://img.vietqr.io/image/${bank.bin}-${bank.accountNo}-compact2.png?amount=${amount}&addInfo=${enc(note)}&accountName=${enc(bank.accountName)}`;
+  `https://img.vietqr.io/image/${bank.bin}-${bank.accountNo}-compact2.svg?amount=${amount}&addInfo=${enc(note)}&accountName=${enc(bank.accountName)}`;
 
 export function bankAppLink(
   appId: string,
