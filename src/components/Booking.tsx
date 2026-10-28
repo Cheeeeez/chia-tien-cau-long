@@ -18,8 +18,11 @@ import {
   type Prepared,
 } from '../lib/booking';
 import { formatVnd } from '../lib/money';
+import { COURT_OWNER_BANK, courtTransferNote } from '../lib/courtPay';
 import { loadBookingSettings, saveBookingSettings } from '../lib/storage';
+import { findBank } from '../lib/vietqr';
 import { ShotViewer } from './ShotViewer';
+import { BankTransfer } from './BankTransfer';
 
 type Phase = 'idle' | 'preparing' | 'prepared' | 'confirming' | 'done' | 'paying' | 'paid';
 
@@ -389,7 +392,7 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
           {done.payment ? (
             <p>
               Đã tạo đơn {done.payment.orderId ?? ''}. Chuyển khoản {done.payment.amount === null ? '' : formatVnd(done.payment.amount)} theo mã
-              QR trong ảnh, rồi chọn ảnh chuyển khoản và gửi lên.
+              QR {done.payment.amount !== null || done.payment.qr ? 'bên dưới' : 'trong ảnh'}, rồi chọn ảnh chuyển khoản và gửi lên.
             </p>
           ) : (
             <p>
@@ -397,6 +400,25 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
                 ? 'Số điện thoại này đã có tài khoản Alobo nên không đặt được khi không đăng nhập. Hãy chọn "Đăng nhập Alobo" rồi đặt lại.'
                 : DONE_MESSAGE[done.status]}
             </p>
+          )}
+          {done.payment && done.payment.amount !== null ? (
+            <div class="card">
+              <p>
+                Chuyển <strong>{formatVnd(done.payment.amount)}</strong> cho <strong>{COURT_OWNER_BANK.accountName}</strong>
+              </p>
+              <p class="muted">
+                {findBank(COURT_OWNER_BANK.bin)?.shortName} • {COURT_OWNER_BANK.accountNo} • {COURT_OWNER_BANK.accountName}
+              </p>
+              <BankTransfer
+                bank={COURT_OWNER_BANK}
+                amount={done.payment.amount}
+                note={courtTransferNote(done.payment.note, who === 'guest' ? settings.name : settings.phone)}
+                baseUrl={baseUrl}
+                qrSrc={done.payment.qr ?? undefined}
+              />
+            </div>
+          ) : (
+            done.payment?.qr && <img class="qr" src={done.payment.qr} width="270" alt="Mã QR thanh toán đơn Alobo" />
           )}
           <ShotViewer src={done.screenshot} alt="Kết quả trên Alobo" />
           {done.payment ? (
@@ -414,21 +436,30 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
                   onChange={(e) => setFile((e.target as HTMLInputElement).files?.[0] ?? null)}
                 />
               </label>
-              <button type="button" class="primary" disabled={!file || phase === 'paying' || secondsLeft <= 0} onClick={pay}>
-                Gửi ảnh thanh toán
-              </button>
+              <div class="stack-actions">
+                <button type="button" class="primary" disabled={!file || phase === 'paying' || secondsLeft <= 0} onClick={pay}>
+                  Gửi ảnh thanh toán
+                </button>
+                <button type="button" class="neutral" disabled={phase === 'paying'} onClick={reset}>
+                  Đóng, không gửi ảnh
+                </button>
+              </div>
               {phase === 'paying' && <p class="hint">Agent đang gửi ảnh lên Alobo…</p>}
             </>
           ) : (
-            <ul>
-              {done.texts.map((t) => (
-                <li>{t}</li>
-              ))}
-            </ul>
+            <>
+              <ul>
+                {done.texts.map((t) => (
+                  <li>{t}</li>
+                ))}
+              </ul>
+              <div class="stack-actions">
+                <button type="button" class="neutral" onClick={reset}>
+                  Đặt lượt khác
+                </button>
+              </div>
+            </>
           )}
-          <button type="button" class="neutral" disabled={phase === 'paying'} onClick={reset}>
-            {done.payment ? 'Đóng, không gửi ảnh' : 'Đặt lượt khác'}
-          </button>
         </div>
       )}
 

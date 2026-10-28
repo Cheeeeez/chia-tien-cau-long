@@ -57,6 +57,9 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .row-actions { display: flex; gap: 8px; align-items: center; }
 .row-actions.wrap { flex-wrap: wrap; margin-top: 12px; }
 .row-actions.between { justify-content: space-between; }
+/* Cột nút hành động: nút (inline-flex) xếp dọc, full-width, cách nhau rõ; không thì chúng dính liền trên cùng một dòng. */
+.stack-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
+.stack-actions > button { width: 100%; }
 .check { display: flex; align-items: center; gap: 8px; min-height: 44px; }
 .sharers { display: flex; flex-wrap: wrap; gap: 0 16px; }
 .sharer-picker > * + * { margin-top: 6px; }

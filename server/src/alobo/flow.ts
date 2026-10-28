@@ -4,6 +4,7 @@ import { HttpError, SessionExpiredError } from '../errors.js';
 import { vnToday, type BookingIntent } from '../intent.js';
 import { BRANCH_URL, COLOR, COURTS, COURT_PRIORITY, GRID, PT, USER_AGENT, VIEWPORT, cellCenter, pickerTarget, slotColumns, type Point } from './layout.js';
 import { Shot, gridColumnWidth, isFree, isSelected, near } from './pixels.js';
+import { cropQr } from './qr.js';
 import { diffSummary, parseSummary, type Summary } from './summary.js';
 
 // Chromium ngốn vài trăm MB RAM nên chỉ giữ khi đang có phiên; rảnh quá BROWSER_IDLE_MS thì đóng, lần sau tự mở lại (~1 giây).
@@ -386,6 +387,19 @@ export interface Payment {
   amount: number | null;
   /** Số giây Alobo còn giữ chỗ khi vào màn thanh toán. */
   holdSeconds: number | null;
+  /** Ảnh PNG data URL chỉ gồm mã QR trên màn thanh toán; null khi không tìm thấy mã trong ảnh chụp. */
+  qr: string | null;
+  /** Nội dung chuyển khoản Alobo hiển thị ("Thanh toan online lich dat 4798"); null khi không thấy dòng này trong chữ đọc được. */
+  note: string | null;
+}
+
+/** Bỏ dấu để khớp "Thanh toán online lịch đặt" lẫn "Thanh toan online lich dat". */
+const stripMarks = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
+
+/** Đọc nội dung chuyển khoản (dạng "Thanh toan online lich dat 4798") ở bất kỳ dòng nào trên màn thanh toán. */
+export function parseTransferNote(texts: string[]): string | null {
+  const m = /thanh toan[^\n\d]*?lich dat\s*(\d+)/i.exec(stripMarks(texts.join('\n')));
+  return m ? `Thanh toan online lich dat ${m[1]}` : null;
 }
 
 /** Đọc mã đơn, số tiền, thời gian giữ chỗ từ màn "Thanh toán"; null nếu chưa phải màn đó. */
@@ -398,6 +412,8 @@ export function parsePayment(texts: string[]): Payment | null {
     orderId: orderAt >= 0 ? (texts[orderAt + 1] ?? null) : null,
     amount: amount ? Number(amount[1].replace(/\./g, '')) : null,
     holdSeconds: hold ? Number(hold[1]) * 60 + Number(hold[2]) : null,
+    qr: null,
+    note: parseTransferNote(texts),
   };
 }
 
@@ -427,6 +443,7 @@ export async function confirm(page: Page): Promise<Confirmed> {
   const texts = await readTexts(page);
   const screenshot = await jpeg(page);
   const payment = parsePayment(texts);
+  if (payment) payment.qr = cropQr(await page.screenshot({ type: 'png' }));
 
   // Alobo chặn đặt không đăng nhập nếu SĐT đã có tài khoản: hiện hộp thoại, không tạo đơn.
   const blocked = texts.some((t) => t.includes('đã có tài khoản'));
