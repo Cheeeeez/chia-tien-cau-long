@@ -14,9 +14,12 @@ Quy tắc:
 
 const invalid = () => new HttpError('AI trả về kết quả không hợp lệ', 502);
 
+export const MAX_COMMAND_LENGTH = 200;
+
 /** Tách câu lệnh tự nhiên thành object thô; việc kiểm tra hợp lệ do `validateIntent` làm. */
 export async function parseCommand(text: string, today: string): Promise<unknown> {
   if (!config.llmApiKey) throw new HttpError('Chưa cấu hình LLM_API_KEY', 503);
+  if (text.length > MAX_COMMAND_LENGTH) throw new HttpError(`Câu lệnh quá dài (tối đa ${MAX_COMMAND_LENGTH} ký tự)`, 400);
   const thu = THU[new Date(`${today}T00:00:00Z`).getUTCDay()];
   const prompt = PROMPT.replace('{thu}', thu).replace('{today}', today);
 

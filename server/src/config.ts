@@ -41,7 +41,7 @@ export const config = {
   allowedPhones: listed.length > 0 ? phones : null,
   /** Số phiên trình duyệt chạy đồng thời; mỗi phiên tốn ~0,5–1 GB RAM. */
   maxSessions: Math.max(1, Number(process.env.MAX_SESSIONS) || 2),
-  /** Tin các header X-Forwarded-For / CF-Connecting-IP (chỉ bật khi máy chủ nằm sau tunnel hoặc reverse proxy). */
+  /** Tin phần tử cuối của X-Forwarded-For (chỉ bật khi máy chủ nằm sau Tailscale Funnel/Cloudflare Tunnel/reverse proxy và cổng chỉ mở trên 127.0.0.1). */
   trustProxy: process.env.TRUST_PROXY === '1',
   llmApiKey: process.env.LLM_API_KEY ?? '',
   llmBaseUrl: (process.env.LLM_BASE_URL ?? 'https://api.freemodel.dev/v1').replace(/\/+$/, ''),

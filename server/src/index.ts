@@ -4,6 +4,7 @@ import type { BrowserContext, Page } from 'playwright';
 import { matchesAccessCode } from './access.js';
 import { AccountStore } from './accounts.js';
 import { confirm, closeBrowser, login, prepare, submitPayment, type Prepared } from './alobo/flow.js';
+import { clientKey } from './clientip.js';
 import { config } from './config.js';
 import { HttpError, SessionExpiredError } from './errors.js';
 import { MAX_IMAGE_BYTES, decodeImage } from './image.js';
@@ -91,16 +92,6 @@ function assertPhoneAllowed(phone: string): void {
   if (config.allowedPhones && !config.allowedPhones.has(phone)) {
     throw new HttpError('Số này chưa được phép dùng máy chủ, hãy nhờ quản trị viên thêm vào', 403);
   }
-}
-
-/** IP người gọi để giới hạn thử sai; sau tunnel/reverse proxy thì lấy từ header của proxy (cần TRUST_PROXY=1). */
-function clientIp(req: IncomingMessage): string {
-  if (config.trustProxy) {
-    const h = req.headers['cf-connecting-ip'] ?? req.headers['x-forwarded-for'];
-    const first = (Array.isArray(h) ? h[0] : h)?.split(',')[0].trim();
-    if (first) return first;
-  }
-  return req.socket.remoteAddress ?? 'unknown';
 }
 
 async function readJson(req: IncomingMessage, max = MAX_BODY): Promise<Record<string, unknown>> {
@@ -224,7 +215,7 @@ async function route(req: IncomingMessage, res: ServerResponse, path: string): P
   const method = req.method ?? 'GET';
   if (method === 'GET' && path === '/health') return reply(res, 200, { ok: true });
   // Mã truy cập chung của nhóm: mọi lệnh khác đều phải kèm, trước cả đăng nhập Alobo.
-  const ip = clientIp(req);
+  const ip = clientKey(req.headers['x-forwarded-for'], req.socket.remoteAddress, config.trustProxy);
   accessFailures.check(ip);
   if (!matchesAccessCode(req.headers['x-access-code'], config.accessCode)) {
     accessFailures.fail(ip);

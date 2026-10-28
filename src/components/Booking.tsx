@@ -297,6 +297,7 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
         {mode === 'command' ? (
           <label class="field">
             <textarea
+              maxLength={200}
               value={command}
               placeholder="VD: mai 19h-21h, sân nào cũng được"
               onInput={(e) => setCommand((e.target as HTMLTextAreaElement).value)}
