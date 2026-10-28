@@ -74,6 +74,13 @@ async function waitColor(page: Page, pt: Point, hex: string, ms: number, msg: st
 const click = (page: Page, pt: Point) => page.mouse.click(pt.x, pt.y);
 const readTexts = (page: Page) => page.evaluate(READ_TEXTS) as Promise<string[]>;
 
+/** Flutter đôi khi không nhận click dù trang đã vẽ xong và bấm lại cũng vô ích (lần tải đó bị kẹt): tải lại trang sân. */
+async function reloadBranch(page: Page): Promise<void> {
+  await page.reload({ waitUntil: 'load', timeout: 45000 });
+  await waitColor(page, PT.datLich, COLOR.branchReady, 30000, 'Trang Alobo không tải xong');
+  await page.waitForTimeout(1500);
+}
+
 export interface Prepared {
   context: BrowserContext;
   page: Page;
@@ -121,8 +128,16 @@ export async function login(phone9: string, password: string): Promise<StorageSt
     await page.waitForTimeout(1500);
 
     // Tab Tài khoản hiện hộp thoại "Tạo tài khoản"; bấm OK sang trang Đăng ký (nền trắng ở modalOk).
-    await click(page, PT.accountTab);
-    await page.waitForTimeout(3000);
+    // Flutter có thể chưa nhận click ngay sau khi vẽ xong trang nên bấm lại đến khi màn hình đổi (tại modalOk) mới đi tiếp.
+    const idle = (await shot(page)).rgb(PT.modalOk.x, PT.modalOk.y);
+    const idleHex = '#' + idle.map((v) => v.toString(16).padStart(2, '0')).join('');
+    for (let attempt = 1; ; attempt++) {
+      await click(page, PT.accountTab);
+      await page.waitForTimeout(2500);
+      if (!near((await shot(page)).rgb(PT.modalOk.x, PT.modalOk.y), idleHex, 12)) break;
+      if (attempt >= 5) throw new HttpError('Không mở được màn đăng nhập Alobo', 502, await jpeg(page));
+      if (attempt % 2 === 0) await reloadBranch(page); // bấm hai lần vẫn không ăn: lần tải này bị kẹt, tải lại
+    }
     for (let attempt = 1; ; attempt++) {
       await click(page, PT.modalOk);
       await page.waitForTimeout(1500);
@@ -189,7 +204,8 @@ export async function prepare(intent: BookingIntent, booker: Booker): Promise<Pr
         await probe(PT.card, COLOR.dialog, 4000, 'Không mở được hộp chọn hình thức đặt');
         break;
       } catch (e) {
-        if (attempt >= 3) throw e;
+        if (attempt >= 5) throw e;
+        if (attempt % 2 === 0) await reloadBranch(page); // bấm hai lần vẫn không ăn: lần tải này bị kẹt, tải lại
       }
     }
     await page.waitForTimeout(700); // dialog còn đang animate: bấm sớm thì card không nhận
