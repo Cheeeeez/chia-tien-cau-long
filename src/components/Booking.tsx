@@ -412,7 +412,7 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
               <BankTransfer
                 bank={COURT_OWNER_BANK}
                 amount={done.payment.amount}
-                note={courtTransferNote(done.payment.note, who === 'guest' ? settings.name : settings.phone)}
+                note={courtTransferNote(done.payment.orderId, who === 'guest' ? settings.name : settings.phone)}
                 baseUrl={baseUrl}
                 qrSrc={done.payment.qr ?? undefined}
               />

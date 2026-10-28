@@ -389,17 +389,6 @@ export interface Payment {
   holdSeconds: number | null;
   /** Ảnh PNG data URL chỉ gồm mã QR trên màn thanh toán; null khi không tìm thấy mã trong ảnh chụp. */
   qr: string | null;
-  /** Nội dung chuyển khoản Alobo hiển thị ("Thanh toan online lich dat 4798"); null khi không thấy dòng này trong chữ đọc được. */
-  note: string | null;
-}
-
-/** Bỏ dấu để khớp "Thanh toán online lịch đặt" lẫn "Thanh toan online lich dat". */
-const stripMarks = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').replace(/đ/g, 'd').replace(/Đ/g, 'D');
-
-/** Đọc nội dung chuyển khoản (dạng "Thanh toan online lich dat 4798") ở bất kỳ dòng nào trên màn thanh toán. */
-export function parseTransferNote(texts: string[]): string | null {
-  const m = /thanh toan[^\n\d]*?lich dat\s*(\d+)/i.exec(stripMarks(texts.join('\n')));
-  return m ? `Thanh toan online lich dat ${m[1]}` : null;
 }
 
 /** Đọc mã đơn, số tiền, thời gian giữ chỗ từ màn "Thanh toán"; null nếu chưa phải màn đó. */
@@ -413,7 +402,6 @@ export function parsePayment(texts: string[]): Payment | null {
     amount: amount ? Number(amount[1].replace(/\./g, '')) : null,
     holdSeconds: hold ? Number(hold[1]) * 60 + Number(hold[2]) : null,
     qr: null,
-    note: parseTransferNote(texts),
   };
 }
 

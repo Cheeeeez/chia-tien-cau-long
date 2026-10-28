@@ -3,11 +3,17 @@ import { COURT_OWNER_BANK, courtTransferNote } from './courtPay';
 import { findBank } from './vietqr';
 
 describe('courtTransferNote', () => {
-  it('ưu tiên nội dung Alobo hiển thị', () => {
-    expect(courtTransferNote('Thanh toan online lich dat 4798', 'Nam')).toBe('Thanh toan online lich dat 4798');
+  it('lấy số trong mã đơn Alobo (#5776) ghép vào nội dung', () => {
+    expect(courtTransferNote('#5776', 'Nam')).toBe('Thanh toan online lich dat 5776');
   });
-  it('không có thì dùng tên người đặt không dấu + chuyen tien', () => {
+  it('mã đơn không có dấu # vẫn lấy được số', () => {
+    expect(courtTransferNote('5776', 'Nam')).toBe('Thanh toan online lich dat 5776');
+  });
+  it('không có mã đơn thì dùng tên người đặt không dấu + chuyen tien', () => {
     expect(courtTransferNote(null, 'Nguyễn Đức Nam')).toBe('NGUYEN DUC NAM chuyen tien');
+  });
+  it('mã đơn không có số cũng quay về tên + chuyen tien', () => {
+    expect(courtTransferNote('abc', 'Nam')).toBe('NAM chuyen tien');
   });
   it('tên dài bị cắt để cả nội dung không quá 40 ký tự mà vẫn giữ chuyen tien', () => {
     const note = courtTransferNote(null, 'Nguyen Thi Phuong Thao Hoang Gia Bao Long Minh');

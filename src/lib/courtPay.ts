@@ -8,11 +8,12 @@ const SUFFIX = ' chuyen tien';
 const MAX_NOTE = 40; // như transferNote: nhiều app ngân hàng cắt nội dung chuyển dài
 
 /**
- * Nội dung chuyển khoản cho đơn Alobo: nguyên văn dòng Alobo hiển thị ("Thanh toan online lich dat 4798") nếu đọc được,
- * không thì "<tên người đặt> chuyen tien".
+ * Nội dung chuyển khoản cho đơn Alobo: "Thanh toan online lich dat <số trong mã đơn>" (mã đơn Alobo hiển thị dạng "#5776").
+ * Không có số trong mã đơn thì dùng "<tên người đặt> chuyen tien".
  */
-export function courtTransferNote(alobo: string | null, payerName: string): string {
-  if (alobo) return alobo;
+export function courtTransferNote(orderId: string | null, payerName: string): string {
+  const code = /\d+/.exec(orderId ?? '')?.[0];
+  if (code) return `Thanh toan online lich dat ${code}`;
   const name = toAsciiUpper(payerName).slice(0, MAX_NOTE - SUFFIX.length).trim();
   return (name + SUFFIX).trim();
 }

@@ -27,8 +27,6 @@ export interface Payment {
   holdSeconds: number | null;
   /** Ảnh PNG (data URL) chỉ gồm mã QR thanh toán, cắt từ màn Alobo; null khi máy chủ không tìm thấy mã trong ảnh chụp. */
   qr: string | null;
-  /** Nội dung chuyển khoản Alobo hiển thị ("Thanh toan online lich dat 4798"); null khi không đọc được dòng này. */
-  note: string | null;
 }
 
 export interface Confirmed {
