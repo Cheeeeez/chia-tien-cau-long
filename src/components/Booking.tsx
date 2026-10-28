@@ -60,6 +60,7 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
   const [paid, setPaid] = useState<Paid | null>(null);
   const [now, setNow] = useState(Date.now());
   const [password, setPassword] = useState(''); // không lưu vào localStorage
+  const [showCode, setShowCode] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const [loginError, setLoginError] = useState<BookingError | null>(null);
 
@@ -203,12 +204,19 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
           <h2>Người đặt</h2>
           <label class="field">
             <span>Mã truy cập</span>
-            <input
-              type="password"
-              autocomplete="off"
-              value={settings.code}
-              onInput={(e) => setSettings({ ...settings, code: (e.target as HTMLInputElement).value })}
-            />
+            <div class="reveal">
+              <input
+                type={showCode ? 'text' : 'password'}
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck={false}
+                value={settings.code}
+                onInput={(e) => setSettings({ ...settings, code: (e.target as HTMLInputElement).value })}
+              />
+              <button type="button" aria-pressed={showCode} aria-label={showCode ? 'Ẩn mã truy cập' : 'Hiện mã truy cập'} onClick={() => setShowCode((v) => !v)}>
+                {showCode ? 'Ẩn' : 'Hiện'}
+              </button>
+            </div>
           </label>
           <div class="segmented">
             <button type="button" class={who === 'guest' ? 'primary' : ''} disabled={busy} onClick={() => setSettings({ ...settings, who: 'guest' })}>

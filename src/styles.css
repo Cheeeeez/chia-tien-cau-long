@@ -66,6 +66,8 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .segmented button { border-radius: 0; }
 .segmented button:first-child { border-radius: 8px 0 0 8px; }
 .segmented button:last-child { border-radius: 0 8px 8px 0; margin-left: -1px; }
+.field + .segmented { margin: 10px 0 6px; }
+.segmented + .field { margin-top: 10px; }
 .weight { display: flex; align-items: center; gap: 6px; font-size: 0.9rem; }
 .weight input { width: 80px; }
 .muted, .hint { color: var(--muted); font-size: 0.9rem; }
@@ -99,6 +101,13 @@ td:nth-child(n + 2), th:nth-child(n + 2) { text-align: right; }
 .tile-title { font-weight: 700; }
 .tile-sub { font-size: 0.85rem; color: var(--muted); }
 .tile-arrow { flex: none; color: var(--muted); font-size: 1.6rem; line-height: 1; }
+/* Ô nhập bí mật có nút Hiện/Ẩn nằm trong ô. */
+.reveal { position: relative; }
+.reveal input { padding-right: 64px; }
+.reveal button {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  min-height: 36px; padding: 0 12px; border: 0; background: none; color: var(--accent);
+}
 .collapse-toggle {
   width: 100%; justify-content: space-between; text-align: left;
   background: none; border: 0; border-radius: 0; padding: 0; min-height: 44px;
