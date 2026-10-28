@@ -6,7 +6,10 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "server:up": "BUILDX_BUILDER=default docker compose -f server/docker-compose.yml up -d --build",
+    "server:down": "docker compose -f server/docker-compose.yml down",
+    "server:logs": "docker compose -f server/docker-compose.yml logs -f --tail=100"
   },
   "dependencies": {
     "preact": "^10.29.8"

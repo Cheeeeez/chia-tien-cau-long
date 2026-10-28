@@ -1,11 +1,14 @@
 import { decodeBill } from './lib/bill';
 import type { Bill } from './lib/types';
 import { BillView } from './components/BillView';
+import { Booking } from './components/Booking';
 import { Creator } from './components/Creator';
 
 export function App() {
   const baseUrl = location.origin + location.pathname;
-  const b = new URLSearchParams(location.search).get('b');
+  const params = new URLSearchParams(location.search);
+  if (params.has('dat-san')) return <Booking baseUrl={baseUrl} />;
+  const b = params.get('b');
   if (b === null) return <Creator baseUrl={baseUrl} />;
 
   let bill: Bill;

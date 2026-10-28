@@ -1,0 +1,17 @@
+services:
+  dat-san-agent:
+    build: .
+    image: dat-san-agent
+    container_name: dat-san-agent
+    init: true
+    shm_size: 1gb # Chromium dùng /dev/shm; mặc định 64MB dễ làm crash tab Flutter nặng (đỡ phải chia sẻ IPC với máy chủ)
+    mem_limit: 3g # mỗi phiên đặt sân đỉnh ~1,1 GB; MAX_SESSIONS=2 cần ~2,5 GB. Chặn để Chromium không ăn hết RAM máy
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "${HOST_PORT:-18787}:8787"
+    volumes:
+      - alobo-data:/data # phiên đăng nhập Alobo, còn nguyên khi build lại image
+
+volumes:
+  alobo-data:

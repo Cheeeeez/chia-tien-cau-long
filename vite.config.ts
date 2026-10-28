@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
+import { configDefaults } from 'vitest/config';
 import preact from '@preact/preset-vite';
 
 // File trong public/ cần có sẵn khi offline; thiếu file nào thì build fail (readFileSync ném lỗi).
@@ -37,4 +38,9 @@ function serviceWorker(): Plugin {
   };
 }
 
-export default defineConfig({ base: './', plugins: [preact(), serviceWorker()], test: { environment: 'node' } });
+// server/ là package riêng (deps riêng); CI gốc không cài deps đó nên không chạy test của nó.
+export default defineConfig({
+  base: './',
+  plugins: [preact(), serviceWorker()],
+  test: { environment: 'node', exclude: [...configDefaults.exclude, 'server/**'] },
+});

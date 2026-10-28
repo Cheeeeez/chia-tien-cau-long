@@ -235,7 +235,17 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
   return (
     <main>
       <h1>🏸 Chia tiền cầu lông</h1>
-      <InstallButton />
+      <div class="top-actions">
+        <a class="tile" href="?dat-san">
+          <span class="tile-icon" aria-hidden="true">🗓</span>
+          <span class="tile-text">
+            <span class="tile-title">Đặt sân</span>
+            <span class="tile-sub">Quốc Học – Từ Sơn</span>
+          </span>
+          <span class="tile-arrow" aria-hidden="true">›</span>
+        </a>
+        <InstallButton />
+      </div>
 
       <section>
         <h2>

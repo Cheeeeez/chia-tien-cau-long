@@ -34,11 +34,11 @@ ul.who > li { display: grid; grid-template-columns: minmax(0, 1fr) 120px 104px; 
 ul.who .weight { justify-self: end; }
 ul.who > li > button { grid-column: 3; padding: 8px 4px; white-space: nowrap; }
 ul.who input[type='checkbox'] { flex-shrink: 0; }
-button, .btn, input, select {
+button, .btn, input, select, textarea {
   font: inherit; min-height: 44px; border-radius: 8px; border: 1px solid var(--border);
   padding: 8px 12px; background: var(--card); color: var(--fg);
 }
-input, select { width: 100%; min-width: 0; max-width: 100%; }
+input, select, textarea { width: 100%; min-width: 0; max-width: 100%; }
 input[type='date'] { appearance: none; -webkit-appearance: none; } /* iOS: ô date có độ rộng nội tại, hay tràn khỏi khung */
 input[type='checkbox'] { width: 22px; min-height: 22px; }
 button, .btn { cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; justify-content: center; font-weight: 600; }
@@ -81,8 +81,31 @@ td:nth-child(n + 2), th:nth-child(n + 2) { text-align: right; }
 .open-app > * + * { margin-top: 8px; }
 .open-app .btn { width: 100%; }
 .install > * + * { margin-top: 8px; }
+/* Lối vào các tính năng ở đầu trang; cách đều nhau để nút Cài app không dính vào ô Đặt sân. */
+.top-actions { display: grid; gap: 12px; margin: 4px 0 16px; }
+/* Cài app là việc phụ: kiểu nhạt để không lấn ô Đặt sân (ghi đè .primary khi trình duyệt cho cài). */
+.top-actions .install > button { width: 100%; background: var(--accent-bg); border-color: var(--accent); color: var(--accent); }
+.tile {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+  color: var(--fg); text-decoration: none; box-shadow: 0 1px 2px rgb(0 0 0 / 6%);
+}
+.tile:active { background: var(--accent-bg); }
+.tile-icon {
+  flex: none; width: 44px; height: 44px; border-radius: 10px; background: var(--accent-bg);
+  display: grid; place-items: center; font-size: 1.5rem;
+}
+.tile-text { flex: 1; min-width: 0; display: grid; }
+.tile-title { font-weight: 700; }
+.tile-sub { font-size: 0.85rem; color: var(--muted); }
+.tile-arrow { flex: none; color: var(--muted); font-size: 1.6rem; line-height: 1; }
 .collapse-toggle {
   width: 100%; justify-content: space-between; text-align: left;
   background: none; border: 0; border-radius: 0; padding: 0; min-height: 44px;
   color: var(--fg); font-size: inherit;
 }
+textarea { min-height: 88px; resize: vertical; }
+.shot { display: block; width: 100%; height: auto; border: 1px solid var(--border); border-radius: 8px; }
+.shot-viewer > * + * { margin-top: 8px; }
+.shot-scroll { overflow: auto; max-height: 70vh; border: 1px solid var(--border); border-radius: 8px; }
+.shot-scroll .shot { border: 0; border-radius: 0; max-width: none; }

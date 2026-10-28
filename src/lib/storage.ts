@@ -70,3 +70,37 @@ export function saveDebts(debts: Debt[]): void {
     // bỏ qua
   }
 }
+
+const BOOKING_KEY = 'caulong.booking.v2';
+
+export interface BookingSettings {
+  phone: string;
+  /** Tên khi đặt không cần tài khoản. */
+  name: string;
+  /** Mã truy cập chung của nhóm (quản trị viên đặt trong BOOKING_TOKEN của máy chủ). */
+  code: string;
+  /** `<sđt>:<mã thiết bị>` do máy chủ cấp khi đăng nhập Alobo; rỗng = chưa đăng nhập. */
+  session: string;
+  /** Đặt như khách (gõ tên + SĐT) hay bằng tài khoản Alobo đã đăng nhập. */
+  who: 'guest' | 'account';
+}
+
+export function loadBookingSettings(): BookingSettings {
+  let v: Record<string, unknown> = {};
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(BOOKING_KEY) ?? '{}');
+    if (raw && typeof raw === 'object') v = raw as Record<string, unknown>;
+  } catch {
+    // dữ liệu hỏng hoặc localStorage không khả dụng: dùng mặc định
+  }
+  const str = (k: string) => (typeof v[k] === 'string' ? (v[k] as string) : '');
+  return { phone: str('phone'), name: str('name'), code: str('code'), session: str('session'), who: str('who') === 'account' ? 'account' : 'guest' };
+}
+
+export function saveBookingSettings(s: BookingSettings): void {
+  try {
+    localStorage.setItem(BOOKING_KEY, JSON.stringify(s));
+  } catch {
+    // bỏ qua
+  }
+}
