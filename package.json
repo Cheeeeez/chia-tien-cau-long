@@ -7,7 +7,7 @@
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "server:up": "BUILDX_BUILDER=default docker compose -f server/docker-compose.yml up -d --build",
+    "server:up": "BUILDX_BUILDER=default docker compose -f server/docker-compose.yml up -d --build && docker image prune -f --filter label=app=dat-san-agent",
     "server:down": "docker compose -f server/docker-compose.yml down",
     "server:logs": "docker compose -f server/docker-compose.yml logs -f --tail=100"
   },

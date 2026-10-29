@@ -1,6 +1,9 @@
 services:
   dat-san-agent:
-    build: .
+    build:
+      context: .
+      labels:
+        app: dat-san-agent # để `server:up` chỉ dọn image <none> của chính dự án này
     image: dat-san-agent
     container_name: dat-san-agent
     init: true
