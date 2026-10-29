@@ -59,7 +59,7 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .row-actions.between { justify-content: space-between; }
 /* Cột nút hành động: nút (inline-flex) xếp dọc, full-width, cách nhau rõ; không thì chúng dính liền trên cùng một dòng. */
 .stack-actions { display: flex; flex-direction: column; gap: 12px; margin-top: 16px; }
-.stack-actions > button { width: 100%; }
+.stack-actions > button, .stack-actions > .btn { width: 100%; }
 .check { display: flex; align-items: center; gap: 8px; min-height: 44px; }
 .sharers { display: flex; flex-wrap: wrap; gap: 0 16px; }
 .sharer-picker > * + * { margin-top: 6px; }
@@ -121,3 +121,8 @@ textarea { min-height: 88px; resize: vertical; }
 .shot-viewer > * + * { margin-top: 8px; }
 .shot-scroll { overflow: auto; max-height: 70vh; border: 1px solid var(--border); border-radius: 8px; }
 .shot-scroll .shot { border: 0; border-radius: 0; max-width: none; }
+/* Tiêu đề mục có nút bên phải (Khoản chi + Tạo bảng mới). */
+.section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 24px 0 8px; }
+.section-head > h2 { margin: 0; }
+.notice { background: var(--accent-bg); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 12px; margin: 8px 0; }
+.check.self { min-height: 36px; font-size: 0.9rem; }

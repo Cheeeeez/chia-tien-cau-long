@@ -8,9 +8,13 @@ const empty: Form = { id: null, name: '', bin: '', accountNo: '', accountName: '
 
 export function RosterEditor({
   roster,
+  selfId,
+  onSelfChange,
   onChange,
 }: {
   roster: Member[];
+  selfId: string | null;
+  onSelfChange: (id: string | null) => void;
   onChange: (next: Member[]) => void;
 }) {
   const [form, setForm] = useState<Form | null>(null);
@@ -65,6 +69,14 @@ export function RosterEditor({
               <div class="muted">
                 {m.bank ? `${findBank(m.bank.bin)?.shortName ?? m.bank.bin} • ${m.bank.accountNo}` : 'chưa có TK'}
               </div>
+              <label class="check self">
+                <input
+                  type="checkbox"
+                  checked={selfId === m.id}
+                  onChange={(e) => onSelfChange((e.currentTarget as HTMLInputElement).checked ? m.id : null)}
+                />
+                Bản thân
+              </label>
             </div>
             <div class="row-actions">
               <button type="button" onClick={() => edit(m)}>Sửa</button>

@@ -20,7 +20,9 @@ import {
 } from '../lib/booking';
 import { formatVnd } from '../lib/money';
 import { COURT_OWNER_BANK, courtTransferNote } from '../lib/courtPay';
-import { loadBookingSettings, saveBookingSettings } from '../lib/storage';
+import { loadBookingSettings, loadDraft, loadRoster, loadSelf, saveBookingSettings, saveDraft } from '../lib/storage';
+import { addCourtFee } from '../lib/draft';
+import { formatDate } from '../lib/text';
 import { findBank } from '../lib/vietqr';
 import { ShotViewer } from './ShotViewer';
 import { BankTransfer } from './BankTransfer';
@@ -67,6 +69,11 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
   const [showCode, setShowCode] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const [loginError, setLoginError] = useState<BookingError | null>(null);
+  const [feeAdded, setFeeAdded] = useState(false);
+  const [self] = useState(() => {
+    const id = loadSelf();
+    return id === null ? null : (loadRoster().find((m) => m.id === id) ?? null);
+  });
 
   const { session, who } = settings;
   // Chế độ khách không gửi mã thiết bị dù máy này đã đăng nhập Alobo trước đó.
@@ -183,6 +190,14 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
     }
   }
 
+  /** Thêm khoản "Tiền sân" vào bảng chia tiền đã lưu; người ứng là "Bản thân" nếu đã tích. */
+  function addFee() {
+    if (!prepared) return;
+    const amount = done?.payment?.amount ?? prepared.summary.total;
+    saveDraft(addCourtFee(loadDraft(), { amount, date: prepared.summary.date, payerId: self?.id ?? '' }));
+    setFeeAdded(true);
+  }
+
   /** Thoát màn kết quả: đóng phiên còn mở ở máy chủ (đơn chưa chuyển khoản sẽ tự nhả chỗ khi hết hạn giữ chỗ). */
   function reset() {
     if (prepared) void cancelBooking(auth, prepared.id);
@@ -191,11 +206,27 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
     setPaid(null);
     setFile(null);
     setPhase('idle');
+    setFeeAdded(false);
   }
 
   const s = prepared?.summary;
   const expires = prepared ? new Date(prepared.expiresAt) : null;
   const secondsLeft = done?.expiresAt ? Math.max(0, Math.round((done.expiresAt - now) / 1000)) : 0;
+  const feeAmount = done?.payment?.amount ?? s?.total ?? 0;
+  const feeAction = feeAdded ? (
+    <a class="btn primary" href={baseUrl}>Mở bảng chia tiền</a>
+  ) : (
+    <button type="button" class="primary" onClick={addFee}>Thêm “Tiền sân” {formatVnd(feeAmount)} vào bảng chia tiền</button>
+  );
+  const feeHint = (
+    <p class="hint" role="status">
+      {feeAdded
+        ? `Đã thêm “Tiền sân” ${formatVnd(feeAmount)} vào bảng chia tiền ngày ${s ? formatDate(s.date) : ''}.`
+        : self
+          ? `Người ứng: ${self.name}.`
+          : 'Chưa tích “Bản thân” ở mục Thành viên nên khoản này chưa có người ứng.'}
+    </p>
+  );
 
   return (
     <main>
@@ -458,10 +489,12 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
                 ))}
               </ul>
               <div class="stack-actions">
+                {done.status === 'submitted' && feeAction}
                 <button type="button" class="neutral" onClick={reset}>
                   Đặt lượt khác
                 </button>
               </div>
+              {done.status === 'submitted' && feeHint}
             </>
           )}
         </div>
@@ -476,9 +509,13 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
               <li>{t}</li>
             ))}
           </ul>
-          <button type="button" onClick={reset}>
-            Đặt lượt khác
-          </button>
+          <div class="stack-actions">
+            {feeAction}
+            <button type="button" class="neutral" onClick={reset}>
+              Đặt lượt khác
+            </button>
+          </div>
+          {feeHint}
         </div>
       )}
         </>

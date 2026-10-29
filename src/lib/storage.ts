@@ -1,4 +1,4 @@
-import type { Debt, Member } from './types';
+import type { Debt, Member, SavedDraft } from './types';
 
 const ROSTER_KEY = 'caulong.roster.v1';
 const BANK_APP_KEY = 'caulong.bankApp.v1';
@@ -66,6 +66,75 @@ export function loadDebts(): Debt[] {
 export function saveDebts(debts: Debt[]): void {
   try {
     localStorage.setItem(DEBTS_KEY, JSON.stringify(debts));
+  } catch {
+    // bỏ qua
+  }
+}
+
+export const DRAFT_KEY = 'caulong.draft.v1';
+
+const isFiniteNumber = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
+
+const isSavedDraft = (x: unknown): x is SavedDraft => {
+  if (typeof x !== 'object' || x === null) return false;
+  const s = x as Record<string, unknown>;
+  if (typeof s.session !== 'string' || s.session === '' || typeof s.shared !== 'boolean') return false;
+  const d = s.draft as Record<string, unknown> | null;
+  if (typeof d !== 'object' || d === null) return false;
+  if (typeof d.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(d.date)) return false;
+  if (!Array.isArray(d.expenses)) return false;
+  for (const e of d.expenses as unknown[]) {
+    if (typeof e !== 'object' || e === null) return false;
+    const x = e as Record<string, unknown>;
+    if (
+      typeof x.key !== 'string' ||
+      typeof x.label !== 'string' ||
+      !isFiniteNumber(x.qty) ||
+      !isFiniteNumber(x.unitPrice) ||
+      typeof x.payerId !== 'string' ||
+      !(x.sharers === undefined || (Array.isArray(x.sharers) && x.sharers.every((id) => typeof id === 'string')))
+    ) {
+      return false;
+    }
+  }
+  const w = d.weights;
+  if (typeof w !== 'object' || w === null || Array.isArray(w)) return false;
+  if (!Object.values(w).every(isFiniteNumber)) return false;
+  return Array.isArray(d.defer) && d.defer.every((k) => typeof k === 'string');
+};
+
+export function loadDraft(): SavedDraft | null {
+  try {
+    const v: unknown = JSON.parse(localStorage.getItem(DRAFT_KEY) ?? 'null');
+    return isSavedDraft(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveDraft(s: SavedDraft): void {
+  try {
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(s));
+  } catch {
+    // bỏ qua
+  }
+}
+
+const SELF_KEY = 'caulong.self.v1';
+
+/** id thành viên được tick "Bản thân". */
+export function loadSelf(): string | null {
+  try {
+    return localStorage.getItem(SELF_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveSelf(id: string | null): void {
+  try {
+    if (id === null) localStorage.removeItem(SELF_KEY);
+    else localStorage.setItem(SELF_KEY, id);
   } catch {
     // bỏ qua
   }

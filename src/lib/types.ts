@@ -31,3 +31,5 @@ export type Draft = {
 };
 /** Khoản nợ chờ trong localStorage. src: id phiên đã sinh ra nó, hoặc 'manual'. usedBy: id phiên đã cộng nó vào bill. */
 export type Debt = { id: string; from: string; to: string; amount: number; date: string; src: string; usedBy?: string };
+/** Bảng chia tiền đang làm, lưu localStorage. session: id phiên của sổ nợ (Debt.src/usedBy); shared: đã bấm Chia sẻ/Copy ít nhất một lần. */
+export type SavedDraft = { session: string; shared: boolean; draft: Draft };

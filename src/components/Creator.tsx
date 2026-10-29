@@ -5,23 +5,15 @@ import { copyText } from '../lib/clipboard';
 import { MANUAL, commitBill, openDebts } from '../lib/debts';
 import { buildMessage } from '../lib/message';
 import { expenseAmount, formatVnd } from '../lib/money';
+import { SHUTTLE_PRICE, newBoard, newExpense } from '../lib/draft';
 import { settle } from '../lib/split';
-import { loadDebts, loadRoster, saveDebts, saveRoster } from '../lib/storage';
+import { DRAFT_KEY, loadDebts, loadDraft, loadRoster, loadSelf, saveDebts, saveDraft, saveRoster, saveSelf } from '../lib/storage';
+import { formatDate } from '../lib/text';
 import type { Debt, Draft, DraftExpense, Member } from '../lib/types';
 import { DebtsEditor } from './DebtsEditor';
 import { InstallButton } from './InstallButton';
 import { RosterEditor } from './RosterEditor';
 import { SettlementView } from './SettlementView';
-
-const SHUTTLE_PRICE = 30000;
-
-const newExpense = (label: string, unitPrice = 0): DraftExpense => ({
-  key: crypto.randomUUID(),
-  label,
-  qty: 1,
-  unitPrice,
-  payerId: '',
-});
 
 function today(): string {
   const d = new Date();
@@ -115,21 +107,37 @@ function SharerPicker({ players, sharers, onChange }: {
 export function Creator({ baseUrl }: { baseUrl: string }) {
   const [roster, setRoster] = useState<Member[]>(loadRoster);
   const [rosterOpen, setRosterOpen] = useState(false);
-  const [draft, setDraft] = useState<Draft>(() => ({
-    date: today(),
-    expenses: [newExpense('Tiền sân'), newExpense('Tiền cầu', SHUTTLE_PRICE)],
-    weights: {},
-    defer: [],
-  }));
+  const [initial] = useState(() => loadDraft() ?? newBoard(today()));
+  const [draft, setDraft] = useState<Draft>(initial.draft);
+  const [session, setSession] = useState(initial.session);
+  const [shared, setShared] = useState(initial.shared);
+  const [selfId, setSelfId] = useState<string | null>(loadSelf);
   const [feedback, setFeedback] = useState('');
   const [ledger, setLedger] = useState<Debt[]>(loadDebts);
-  const [session] = useState(() => crypto.randomUUID());
 
   useEffect(() => saveRoster(roster), [roster]);
   useEffect(() => saveDebts(ledger), [ledger]);
+  useEffect(() => saveDraft({ session, shared, draft }), [session, shared, draft]);
+  useEffect(() => saveSelf(selfId), [selfId]);
+  // Trang đặt sân ghi thẳng vào bảng đã lưu. Quay lại bằng Back (bfcache) hoặc tab khác ghi thì state trong bộ nhớ đã cũ, lần sửa sau sẽ ghi đè: đọc lại.
+  useEffect(() => {
+    const sync = () => {
+      const b = loadDraft();
+      if (!b) return;
+      setDraft(b.draft);
+      setSession(b.session);
+      setShared(b.shared);
+    };
+    const onShow = (e: PageTransitionEvent) => { if (e.persisted) sync(); };
+    const onStorage = (e: StorageEvent) => { if (e.key === DRAFT_KEY) sync(); };
+    addEventListener('pageshow', onShow);
+    addEventListener('storage', onStorage);
+    return () => { removeEventListener('pageshow', onShow); removeEventListener('storage', onStorage); };
+  }, []);
 
   const changeRoster = (next: Member[]) => {
     const ids = new Set(next.map((m) => m.id));
+    setSelfId((s) => (s !== null && ids.has(s) ? s : null));
     setRoster(next);
     setLedger((l) => l.filter((d) => ids.has(d.from) && ids.has(d.to)));
     setDraft((d) => ({
@@ -142,6 +150,14 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
 
   const patchExpense = (key: string, patch: Partial<DraftExpense>) =>
     setDraft((d) => ({ ...d, expenses: d.expenses.map((x) => (x.key === key ? { ...x, ...patch } : x)) }));
+
+  const startBoard = () => {
+    if (!shared && !window.confirm('Bảng này chưa chia sẻ. Xoá hết để tạo bảng mới?')) return;
+    const b = newBoard(today());
+    setSession(b.session);
+    setShared(false);
+    setDraft(b.draft);
+  };
 
   const setWeight = (id: string, w: number) =>
     setDraft((d) => ({ ...d, weights: { ...d.weights, [id]: w } }));
@@ -172,7 +188,8 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
     const bill = draftToBill(roster, draft, open);
     const s = settle(bill);
     url = billUrl(baseUrl, bill);
-    const commit = () =>
+    const commit = () => {
+      setShared(true);
       setLedger((l) =>
         commitBill(
           l,
@@ -181,6 +198,7 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
           s.deferred.map((t) => ({ from: ids[t.from], to: ids[t.to], amount: t.amount, date: draft.date })),
         ),
       );
+    };
     // Đã rút gọn sẵn (xem useEffect bên dưới) nên await trả về ngay, giữ nguyên thao tác người dùng cho navigator.share.
     // commit() chạy trước mọi await.
     const share = async () => {
@@ -261,12 +279,20 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
         </h2>
         {/* Ẩn bằng hidden thay vì gỡ khỏi DOM để form đang nhập dở không bị mất. */}
         <div hidden={!rosterOpen}>
-          <RosterEditor roster={roster} onChange={changeRoster} />
+          <RosterEditor roster={roster} selfId={selfId} onSelfChange={setSelfId} onChange={changeRoster} />
         </div>
       </section>
 
       <section>
-        <h2>Khoản chi</h2>
+        <div class="section-head">
+          <h2>Khoản chi</h2>
+          <button type="button" class="neutral" onClick={startBoard}>Tạo bảng mới</button>
+        </div>
+        {shared && (
+          <p class="notice">
+            Bảng ngày {formatDate(draft.date)} đã chia sẻ. Sửa xong bấm Chia sẻ/Copy lại để gửi link mới; buổi khác thì bấm “Tạo bảng mới”.
+          </p>
+        )}
         <label class="field">
           <span>Ngày</span>
           <input
