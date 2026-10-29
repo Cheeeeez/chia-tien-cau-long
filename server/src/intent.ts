@@ -26,6 +26,14 @@ function minutes(hhmm: unknown, label: string): number {
   return h * 60 + min;
 }
 
+/** Khung giờ Alobo gộp thành một ô duy nhất trên bảng chọn (phút từ 00:00): 18:00–20:00. */
+const FIXED_BLOCK = { start: 1080, end: 1200 };
+
+/** Khung [s, e) chạm vào khung gộp thì phải phủ trọn nó, không được cắt ngang. */
+function cutsFixedBlock(s: number, e: number): boolean {
+  return s < FIXED_BLOCK.end && e > FIXED_BLOCK.start && (s > FIXED_BLOCK.start || e < FIXED_BLOCK.end);
+}
+
 export function validateIntent(raw: unknown, today: string): BookingIntent {
   if (!raw || typeof raw !== 'object') throw bad('Yêu cầu đặt sân không hợp lệ');
   const r = raw as Record<string, unknown>;
@@ -41,6 +49,9 @@ export function validateIntent(raw: unknown, today: string): BookingIntent {
   const s = minutes(r.start, 'bắt đầu');
   const e = minutes(r.end, 'kết thúc');
   if (s < 300 || s >= e || e > 1440) throw bad('Khung giờ phải nằm trong 05:00–24:00 và giờ bắt đầu trước giờ kết thúc');
+  if (cutsFixedBlock(s, e)) {
+    throw bad('Khung 18:00–20:00 là một ca cố định, không đặt lẻ một phần được: hãy đặt trọn 18:00–20:00 (hoặc trùm cả khung này)');
+  }
 
   const court = r.court ?? null;
   if (court !== null && !(typeof court === 'number' && Number.isInteger(court) && court >= 1 && court <= 10)) {

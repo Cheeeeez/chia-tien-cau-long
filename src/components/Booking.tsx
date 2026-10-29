@@ -8,6 +8,7 @@ import {
   deleteAccount,
   payBooking,
   prepareBooking,
+  fixedBlockError,
   signIn,
   signOut,
   toPaymentImage,
@@ -54,7 +55,7 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
   const [settings, setSettings] = useState(loadBookingSettings);
   const [mode, setMode] = useState<'command' | 'form'>('command');
   const [command, setCommand] = useState('');
-  const [form, setForm] = useState({ date: today(), start: '19:00', end: '21:00', court: null as number | null });
+  const [form, setForm] = useState({ date: today(), start: '18:00', end: '20:00', court: null as number | null });
   const [phase, setPhase] = useState<Phase>('idle');
   const [error, setError] = useState<BookingError | null>(null);
   const [prepared, setPrepared] = useState<Prepared | null>(null);
@@ -90,7 +91,8 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
   const busy = phase === 'preparing' || phase === 'confirming' || phase === 'paying';
   const hasCode = settings.code.trim() !== '';
   const identified = who === 'guest' ? settings.name.trim() !== '' && settings.phone.trim() !== '' : session !== '';
-  const ready = hasCode && identified && (mode === 'form' || command.trim() !== '');
+  const timeError = mode === 'form' ? fixedBlockError(form.start, form.end) : null;
+  const ready = hasCode && identified && !timeError && (mode === 'form' || command.trim() !== '');
 
   const toError = (e: unknown) => (e instanceof BookingError ? e : new BookingError('Lỗi không xác định'));
 
@@ -299,7 +301,7 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
             <textarea
               maxLength={200}
               value={command}
-              placeholder="VD: mai 19h-21h, sân nào cũng được"
+              placeholder="VD: mai 18h-20h, sân nào cũng được"
               onInput={(e) => setCommand((e.target as HTMLTextAreaElement).value)}
             />
           </label>
@@ -332,6 +334,7 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
                 </select>
               </label>
             </div>
+            {timeError && <p class="error">{timeError}</p>}
             <label class="field">
               <span>Sân</span>
               <select

@@ -365,13 +365,14 @@ function recordWrites(page: Page): RequestLog {
   return requests;
 }
 
-/** Tâm của phần tử semantics có chữ (textContent hoặc aria-label) bắt đầu bằng `text`; null nếu không có. */
+/** Tâm của phần tử semantics có chữ (textContent hoặc aria-label) bắt đầu bằng `text` (không phân biệt hoa/thường); null nếu không có. */
 async function semanticsCenter(page: Page, text: string): Promise<Point | null> {
   return page.evaluate(
     (t) => {
+      const want = t.toLowerCase();
       for (const el of document.querySelectorAll('flt-semantics')) {
         const s = (el.textContent || '').trim() || (el.getAttribute('aria-label') || '').trim();
-        if (s.startsWith(t)) {
+        if (s.toLowerCase().startsWith(want)) {
           const b = el.getBoundingClientRect();
           return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
         }
@@ -471,5 +472,19 @@ export async function submitPayment(page: Page, image: Buffer, fileName: string)
   if (!next) throw new HttpError('Không thấy nút Tiếp tục thanh toán', 502, await jpeg(page));
   await page.mouse.click(next.x, next.y);
   await page.waitForTimeout(8000);
-  return { status: statusOf(requests), texts: await readTexts(page), requests, screenshot: await jpeg(page) };
+  const texts = await readTexts(page);
+  const status = statusOf(requests);
+  let screenshot = await jpeg(page);
+
+  // Ảnh trả về là màn "Lịch đặt" sau khi bấm "Xem lịch đặt" ở màn "Đặt lịch thành công". Ảnh chuyển khoản đã gửi rồi nên
+  // không thấy nút hoặc màn mới không tải được thì vẫn trả kết quả với ảnh màn thành công, không báo lỗi.
+  const view = await semanticsCenter(page, 'Xem lịch đặt');
+  if (view) {
+    await page.mouse.click(view.x, view.y);
+    await page.waitForTimeout(4000);
+    screenshot = await jpeg(page);
+  } else {
+    console.error('Không thấy nút "Xem lịch đặt" sau khi gửi ảnh thanh toán');
+  }
+  return { status, texts, requests, screenshot };
 }

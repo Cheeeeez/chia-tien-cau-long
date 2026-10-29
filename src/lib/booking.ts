@@ -1,6 +1,22 @@
 /** Địa chỉ máy chủ đặt sân, cố định lúc build (biến VITE_BOOKING_API_URL); rỗng nghĩa là chưa cấu hình. */
 export const BOOKING_API_URL: string = import.meta.env.VITE_BOOKING_API_URL ?? '';
 
+/** Ca 18:00–20:00 là một ô duy nhất trên bảng chọn giờ của Alobo (phút từ 00:00). Trùng với `FIXED_BLOCK` ở server/src/intent.ts. */
+const FIXED_BLOCK = { start: 1080, end: 1200 };
+
+const toMinutes = (hhmm: string) => {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+};
+
+/** Lý do khung [start, end) không đặt được vì cắt ngang ca cố định; null nếu hợp lệ. */
+export function fixedBlockError(start: string, end: string): string | null {
+  const s = toMinutes(start);
+  const e = toMinutes(end);
+  const cuts = s < FIXED_BLOCK.end && e > FIXED_BLOCK.start && (s > FIXED_BLOCK.start || e < FIXED_BLOCK.end);
+  return cuts ? 'Ca 18:00–20:00 là một ô cố định: hãy đặt trọn 18:00–20:00 (hoặc trùm cả ca), không đặt lẻ một phần.' : null;
+}
+
 export type BookingRequest =
   | { command: string }
   | { date: string; start: string; end: string; court: number | null };
