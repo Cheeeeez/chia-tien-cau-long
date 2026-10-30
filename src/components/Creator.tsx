@@ -286,7 +286,7 @@ export function Creator({ baseUrl }: { baseUrl: string }) {
       <section>
         <div class="section-head">
           <h2>Khoản chi</h2>
-          <button type="button" class="neutral" onClick={startBoard}>Tạo bảng mới</button>
+          <button type="button" class="new-board" onClick={startBoard}>Tạo bảng mới</button>
         </div>
         {shared && (
           <p class="notice">

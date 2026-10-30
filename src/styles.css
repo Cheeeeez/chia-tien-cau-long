@@ -124,5 +124,13 @@ textarea { min-height: 88px; resize: vertical; }
 /* Tiêu đề mục có nút bên phải (Khoản chi + Tạo bảng mới). */
 .section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 24px 0 8px; }
 .section-head > h2 { margin: 0; }
+/* Nút Tạo bảng mới: viền xanh đậm + nền trắng + bóng nhẹ để nổi bật nhưng không lấn nút .primary. */
+.section-head > button.new-board {
+  flex-shrink: 0; gap: 6px; padding: 8px 16px; min-height: 40px; white-space: nowrap;
+  background: var(--card); color: var(--accent); border: 2px solid var(--accent);
+  box-shadow: 0 1px 3px rgb(10 125 79 / 25%);
+}
+.section-head > button.new-board::before { content: '+'; font-size: 1.25rem; line-height: 1; font-weight: 700; }
+.section-head > button.new-board:hover { background: var(--accent-bg); }
 .notice { background: var(--accent-bg); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 12px; margin: 8px 0; }
 .check.self { min-height: 36px; font-size: 0.9rem; }
