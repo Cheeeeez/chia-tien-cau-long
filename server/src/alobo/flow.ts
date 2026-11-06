@@ -3,7 +3,7 @@ import type { StorageState } from '../accounts.js';
 import { HttpError, SessionExpiredError } from '../errors.js';
 import { vnToday, type BookingIntent } from '../intent.js';
 import { BRANCH_URL, COLOR, COURTS, COURT_PRIORITY, GRID, PT, USER_AGENT, VIEWPORT, cellCenter, pickerTarget, slotColumns, type Point } from './layout.js';
-import { Shot, gridColumnWidth, isFree, isSelected, near } from './pixels.js';
+import { Shot, isFree, isSelected, measureGrid, near } from './pixels.js';
 import { cropQr } from './qr.js';
 import { diffSummary, parseSummary, type Summary } from './summary.js';
 
@@ -253,19 +253,19 @@ export async function prepare(intent: BookingIntent, booker: Booker): Promise<Pr
     // ô kế bên hoặc không nhận ô. Bấm lại ô đã chọn sẽ bỏ chọn, nên mỗi lần bấm đều xem lại trạng thái và chỉ bấm ô chưa chọn.
     // Hàng sân không đúng khung giờ yêu cầu thì bỏ chọn và thử sân kế tiếp.
     const before = await shot(page);
-    const colW = gridColumnWidth(before, await jpeg(page));
+    const grid = measureGrid(before, await jpeg(page));
     const cols = slotColumns(intent.start, intent.end);
     const candidates = intent.court ? [intent.court] : COURT_PRIORITY;
     const selectedCols = (s: Shot, c: number) =>
       Array.from({ length: GRID.cols }, (_, col) => col).filter((col) => {
-        const p = cellCenter(col, c, colW);
+        const p = cellCenter(col, c, grid);
         return isSelected(s.rgb(p.x, p.y));
       });
     const clearRow = async (c: number) => {
       for (let i = 0; i < GRID.cols; i++) {
         const sel = selectedCols(await shot(page), c);
         if (sel.length === 0) return;
-        await click(page, cellCenter(sel[0], c, colW));
+        await click(page, cellCenter(sel[0], c, grid));
         await page.waitForTimeout(400);
       }
       throw new HttpError('Không bỏ chọn được ô trên bảng lịch', 502, await jpeg(page));
@@ -275,7 +275,7 @@ export async function prepare(intent: BookingIntent, booker: Booker): Promise<Pr
     let anyFree = false;
     for (const c of candidates) {
       const free = cols.every((col) => {
-        const p = cellCenter(col, c, colW);
+        const p = cellCenter(col, c, grid);
         return isFree(before.rgb(p.x, p.y));
       });
       if (!free) continue;
@@ -283,7 +283,7 @@ export async function prepare(intent: BookingIntent, booker: Booker): Promise<Pr
       let sel = selectedCols(await shot(page), c);
       for (const col of cols) {
         if (sel.includes(col)) continue;
-        await click(page, cellCenter(col, c, colW));
+        await click(page, cellCenter(col, c, grid));
         await page.waitForTimeout(400);
         sel = selectedCols(await shot(page), c);
       }

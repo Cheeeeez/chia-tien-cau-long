@@ -16,7 +16,8 @@ export interface Point {
 export const PT = {
   datLich: { x: 1644, y: 280 },
   card: { x: 850, y: 470 },
-  dateButton: { x: 1611, y: 74 },
+  // Nút "Tháng N, YYYY ⌄" ở góc trái thanh ngày: bấm vào mở hộp chọn lịch.
+  dateButton: { x: 80, y: 77 },
   nextMonth: { x: 987, y: 342 },
   pickerConfirm: { x: 953, y: 671 },
   tiepTheo: { x: 850, y: 965 },
@@ -40,9 +41,21 @@ export const COLOR = {
   free: '#ffffff',
   selected: '#c7eedb',
   background: ['#e6f8ef', '#edfff6'],
+  /** Dải nhãn giờ (5:00 … 24:00) ngay trên lưới. */
+  gridHeader: '#b2eefb',
 };
 
-export const GRID = { left: 60, top: 287, rowH: 40, cols: 38, firstMinute: 300, scanY: 307, minColW: 40, maxColW: 44 };
+/**
+ * Mép trên của lưới KHÔNG cố định: phần ghi chú phía trên dài/ngắn tùy Alobo (từng đẩy lưới xuống ~62px), nên `top` được dò
+ * ở mỗi lần chạy (xem `measureGrid`), chỉ lưu ở đây dải quét: cột `headerScanX` nằm ngoài lưới, dải tiêu đề giờ trải kín tới đó.
+ */
+export const GRID = { left: 60, rowH: 40, cols: 38, firstMinute: 300, minColW: 40, maxColW: 44, headerScanX: 1699, headerScanFrom: 150, headerScanTo: 700 };
+
+/** Kích thước lưới đo được từ ảnh chụp: `top` là mép trên hàng sân 1, `colW` là độ rộng một cột 30 phút. */
+export interface GridGeometry {
+  top: number;
+  colW: number;
+}
 
 /** "HH:MM" → số phút từ 00:00. */
 export function toMinutes(hhmm: string): number {
@@ -58,8 +71,8 @@ export function slotColumns(start: string, end: string): number[] {
 }
 
 /** Tâm ô (cột 0-based, sân 1-based). */
-export function cellCenter(col: number, court: number, colW: number): Point {
-  return { x: Math.round(GRID.left + colW * (col + 0.5)), y: GRID.top + GRID.rowH * (court - 1) + GRID.rowH / 2 };
+export function cellCenter(col: number, court: number, grid: GridGeometry): Point {
+  return { x: Math.round(GRID.left + grid.colW * (col + 0.5)), y: grid.top + GRID.rowH * (court - 1) + GRID.rowH / 2 };
 }
 
 /** Vị trí ô ngày trong date picker: số lần bấm "Tháng sau" và tọa độ ô (tuần bắt đầu Thứ Hai). */
