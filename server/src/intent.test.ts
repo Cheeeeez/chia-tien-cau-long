@@ -1,8 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { normalizePhone, validateIntent } from './intent.js';
+import { normalizePhone, validateDate, validateIntent } from './intent.js';
 
 const today = '2026-10-28';
 const ok = { date: '2026-10-30', start: '18:00', end: '20:00', court: null };
+
+describe('validateDate', () => {
+  it('chấp nhận hôm nay và ngày sau', () => {
+    expect(validateDate(today, today)).toBe(today);
+    expect(validateDate('2026-12-01', today)).toBe('2026-12-01');
+  });
+  it.each([['ngày quá khứ', '2026-10-27'], ['ngày không có thật', '2026-02-30'], ['sai định dạng', '30/10/2026'], ['không phải chuỗi', 20261030]])(
+    'từ chối %s',
+    (_, v) => {
+      expect(() => validateDate(v, today)).toThrow();
+    },
+  );
+});
 
 describe('validateIntent', () => {
   it('chấp nhận hợp lệ, kể cả 24:00', () => {

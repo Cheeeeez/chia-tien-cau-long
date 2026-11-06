@@ -34,17 +34,23 @@ function cutsFixedBlock(s: number, e: number): boolean {
   return s < FIXED_BLOCK.end && e > FIXED_BLOCK.start && (s > FIXED_BLOCK.start || e < FIXED_BLOCK.end);
 }
 
-export function validateIntent(raw: unknown, today: string): BookingIntent {
-  if (!raw || typeof raw !== 'object') throw bad('Yêu cầu đặt sân không hợp lệ');
-  const r = raw as Record<string, unknown>;
-
-  const dm = typeof r.date === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(r.date) : null;
+/** Ngày YYYY-MM-DD có thật và không trước `today`; trả lại chính chuỗi đó. */
+export function validateDate(raw: unknown, today: string): string {
+  const dm = typeof raw === 'string' ? /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw) : null;
   if (!dm) throw bad('Ngày không hợp lệ');
   const d = new Date(Date.UTC(+dm[1], +dm[2] - 1, +dm[3]));
   if (d.getUTCFullYear() !== +dm[1] || d.getUTCMonth() !== +dm[2] - 1 || d.getUTCDate() !== +dm[3]) {
     throw bad('Ngày không hợp lệ');
   }
-  if ((r.date as string) < today) throw bad('Ngày đã qua');
+  if ((raw as string) < today) throw bad('Ngày đã qua');
+  return raw as string;
+}
+
+export function validateIntent(raw: unknown, today: string): BookingIntent {
+  if (!raw || typeof raw !== 'object') throw bad('Yêu cầu đặt sân không hợp lệ');
+  const r = raw as Record<string, unknown>;
+
+  const date = validateDate(r.date, today);
 
   const s = minutes(r.start, 'bắt đầu');
   const e = minutes(r.end, 'kết thúc');
@@ -57,7 +63,7 @@ export function validateIntent(raw: unknown, today: string): BookingIntent {
   if (court !== null && !(typeof court === 'number' && Number.isInteger(court) && court >= 1 && court <= 10)) {
     throw bad('Sân phải từ 1 đến 10');
   }
-  return { date: r.date as string, start: r.start as string, end: r.end as string, court };
+  return { date, start: r.start as string, end: r.end as string, court };
 }
 
 /** Về dạng 9 chữ số không có số 0 đầu (Alobo tự thêm). */

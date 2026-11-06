@@ -4,7 +4,7 @@ export const BOOKING_API_URL: string = import.meta.env.VITE_BOOKING_API_URL ?? '
 /** Ca 18:00–20:00 là một ô duy nhất trên bảng chọn giờ của Alobo (phút từ 00:00). Trùng với `FIXED_BLOCK` ở server/src/intent.ts. */
 const FIXED_BLOCK = { start: 1080, end: 1200 };
 
-const toMinutes = (hhmm: string) => {
+export const toMinutes = (hhmm: string) => {
   const [h, m] = hhmm.split(':').map(Number);
   return h * 60 + m;
 };
@@ -27,6 +27,19 @@ export interface Summary {
   start: string;
   end: string;
   total: number;
+}
+
+/** Bảng lịch Alobo của một ngày (chỉ đọc). */
+export interface Availability {
+  date: string;
+  /** Có khi gửi câu lệnh: ngày + khung giờ máy chủ hiểu được, để điền sẵn form. */
+  query?: { date: string; start: string; end: string };
+  /** `free[sân - 1][cột]`: ô trống; cột 0 = 05:00, mỗi cột 30 phút. */
+  free: boolean[][];
+  /** Ảnh bảng lịch (JPEG data URL). */
+  screenshot: string;
+  /** Giờ máy chủ đọc bảng lịch (ms); kết quả được giữ tối đa ~60 giây. */
+  checkedAt: number;
 }
 
 export interface Prepared {
@@ -130,6 +143,11 @@ export async function signOut(a: Auth): Promise<void> {
 /** Xoá tài khoản khỏi máy chủ: phiên, mật khẩu đã lưu và mọi thiết bị đang đăng nhập. */
 export async function deleteAccount(a: Auth): Promise<void> {
   await call(a, 'account', 'DELETE', 10_000);
+}
+
+/** Xem sân trống của một ngày (hoặc của ngày trong câu lệnh). Chỉ cần mã truy cập; máy chủ mở Alobo thật nên mất ~30 giây nếu chưa có trong bộ nhớ đệm. */
+export function checkAvailability(a: Auth, req: { date: string } | { command: string }): Promise<Availability> {
+  return call(a, 'availability', 'POST', 120_000, req);
 }
 
 /** `guest`: tên + SĐT khi đặt không cần tài khoản (bỏ trống nếu đã đăng nhập Alobo, Alobo tự điền). */

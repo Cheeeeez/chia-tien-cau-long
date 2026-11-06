@@ -1,6 +1,6 @@
 import { PNG } from 'pngjs';
 import { HttpError } from '../errors.js';
-import { COLOR, GRID, type GridGeometry } from './layout.js';
+import { COLOR, COURTS, GRID, cellCenter, type GridGeometry } from './layout.js';
 
 export type RGB = [number, number, number];
 
@@ -44,6 +44,9 @@ function gridTop(shot: Shot): number | null {
   return y < headerScanTo ? y : null;
 }
 
+/** Dải nhãn giờ của lưới đã vẽ chưa (trang còn quay vòng tải thì chưa có). */
+export const hasGridHeader = (shot: Shot): boolean => gridTop(shot) !== null;
+
 /**
  * Đo lưới lịch: mép trên (hàng sân 1) và độ rộng một cột 30 phút. Độ rộng đo từ mép phải của lưới, đi từ ngoài vào trên hàng sân 1
  * (nền lưới khác nền ngoài lưới). Không đo được hoặc số đo vô lý thì coi như Alobo đổi bố cục.
@@ -73,3 +76,13 @@ export function measureGrid(shot: Shot, screenshot?: string): GridGeometry {
 
 export const isFree = (rgb: RGB) => near(rgb, COLOR.free, 10);
 export const isSelected = (rgb: RGB) => near(rgb, COLOR.selected, 16);
+
+/** Đọc cả lưới: `[sân - 1][cột]` là true khi ô trống (trắng). Chỉ đọc, không chọn ô nào. */
+export function readGrid(shot: Shot, grid: GridGeometry): boolean[][] {
+  return COURTS.map((_, i) =>
+    Array.from({ length: GRID.cols }, (_, col) => {
+      const p = cellCenter(col, i + 1, grid);
+      return isFree(shot.rgb(p.x, p.y));
+    }),
+  );
+}

@@ -3,12 +3,12 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import type { BrowserContext, Page } from 'playwright';
 import { matchesAccessCode } from './access.js';
 import { AccountStore } from './accounts.js';
-import { confirm, closeBrowser, login, prepare, submitPayment, type Prepared } from './alobo/flow.js';
+import { checkAvailability, confirm, closeBrowser, login, prepare, submitPayment, type Availability, type Prepared } from './alobo/flow.js';
 import { clientKey } from './clientip.js';
 import { config } from './config.js';
 import { HttpError, SessionExpiredError } from './errors.js';
 import { MAX_IMAGE_BYTES, decodeImage } from './image.js';
-import { normalizePhone, validateIntent, validateName, vnToday, type BookingIntent } from './intent.js';
+import { normalizePhone, validateDate, validateIntent, validateName, vnToday, type BookingIntent } from './intent.js';
 import { parseCommand } from './llm.js';
 import { Pool } from './pool.js';
 import { FailureLimiter } from './ratelimit.js';
@@ -189,6 +189,51 @@ async function createBooking(caller: Caller, body: Record<string, unknown>) {
   }
 }
 
+const AVAILABILITY_TTL_MS = 60_000;
+const availabilityCache = new Map<string, { at: number; value: AvailabilityResult }>();
+const availabilityInflight = new Map<string, Promise<AvailabilityResult>>();
+
+type AvailabilityResult = Availability & { checkedAt: number };
+
+/** Lưới trống của một ngày: dùng kết quả < 60 giây trước, và nhiều người hỏi cùng ngày một lúc chỉ mở một trình duyệt. */
+function availabilityFor(date: string): Promise<AvailabilityResult> {
+  const now = Date.now();
+  for (const [d, c] of availabilityCache) if (now - c.at >= AVAILABILITY_TTL_MS) availabilityCache.delete(d);
+  const cached = availabilityCache.get(date);
+  if (cached) return Promise.resolve(cached.value);
+  const running = availabilityInflight.get(date);
+  if (running) return running;
+
+  const job = (async () => {
+    const release = await pool.acquire(SLOT_WAIT_MS);
+    try {
+      const value = { ...(await checkAvailability(date)), checkedAt: Date.now() };
+      availabilityCache.set(date, { at: value.checkedAt, value });
+      return value;
+    } finally {
+      release();
+    }
+  })().finally(() => availabilityInflight.delete(date));
+  availabilityInflight.set(date, job);
+  return job;
+}
+
+/** Chỉ đọc bảng lịch Alobo, không cần đăng nhập. `{ command }` được hiểu thành ngày + khung giờ để máy khách điền sẵn form. */
+async function getAvailability(body: Record<string, unknown>) {
+  const today = vnToday();
+  let query: { date: string; start: string; end: string } | undefined;
+  let date: string;
+  if (typeof body.command === 'string') {
+    const { date: d, start, end } = validateIntent(await parseCommand(body.command, today), today);
+    query = { date: d, start, end };
+    date = d;
+  } else {
+    date = validateDate(body.date, today);
+  }
+  const { free, screenshot, checkedAt } = await availabilityFor(date);
+  return { date, query, free, screenshot, checkedAt };
+}
+
 /** Đăng nhập Alobo bằng SĐT + mật khẩu; đúng thì lưu tài khoản và cấp mã cho thiết bị này. */
 async function signIn(body: Record<string, unknown>) {
   const phone = normalizePhone(String(body.phone ?? ''));
@@ -222,6 +267,7 @@ async function route(req: IncomingMessage, res: ServerResponse, path: string): P
     throw new HttpError('Sai mã truy cập', 403);
   }
   if (method === 'POST' && path === '/accounts') return reply(res, 200, await signIn(await readJson(req)));
+  if (method === 'POST' && path === '/availability') return reply(res, 200, await getAvailability(await readJson(req)));
 
   const caller = identify(req);
 

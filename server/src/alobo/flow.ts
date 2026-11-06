@@ -3,7 +3,7 @@ import type { StorageState } from '../accounts.js';
 import { HttpError, SessionExpiredError } from '../errors.js';
 import { vnToday, type BookingIntent } from '../intent.js';
 import { BRANCH_URL, COLOR, COURTS, COURT_PRIORITY, GRID, PT, USER_AGENT, VIEWPORT, cellCenter, pickerTarget, slotColumns, type Point } from './layout.js';
-import { Shot, isFree, isSelected, measureGrid, near } from './pixels.js';
+import { Shot, hasGridHeader, isFree, isSelected, measureGrid, near, readGrid } from './pixels.js';
 import { cropQr } from './qr.js';
 import { diffSummary, parseSummary, type Summary } from './summary.js';
 
@@ -187,67 +187,102 @@ export async function login(phone9: string, password: string): Promise<StorageSt
  * Đi tới trang tóm tắt của Alobo (dừng trước nút xác nhận).
  * Khách (`guest`): gõ tên + SĐT vào form. Tài khoản (`account`): dùng phiên đã lưu, Alobo tự điền tên/SĐT.
  */
+/** Bước 1–4: mở trang sân → hộp "Đặt lịch" → bảng lịch → chọn `date` (YYYY-MM-DD). Xong là bảng lịch của ngày đó đã vẽ. */
+async function openSchedule(page: Page, date: string): Promise<void> {
+  const probe = (pt: Point, hex: string, ms: number, msg: string) => waitColor(page, pt, hex, ms, msg);
+
+  // 1. trang sân
+  await page.goto(BRANCH_URL, { waitUntil: 'load', timeout: 45000 });
+  await probe(PT.datLich, COLOR.branchReady, 30000, 'Trang Alobo không tải xong');
+
+  // 2. dialog
+  // Flutter có thể chưa nhận click ngay sau khi trang vừa vẽ xong nên thử lại vài lần.
+  for (let attempt = 1; ; attempt++) {
+    await click(page, PT.datLich);
+    try {
+      await probe(PT.card, COLOR.dialog, 4000, 'Không mở được hộp chọn hình thức đặt');
+      break;
+    } catch (e) {
+      if (attempt >= 5) throw e;
+      if (attempt % 2 === 0) await reloadBranch(page); // bấm hai lần vẫn không ăn: lần tải này bị kẹt, tải lại
+    }
+  }
+  await page.waitForTimeout(700); // dialog còn đang animate: bấm sớm thì card không nhận
+
+  // 3. bảng lịch
+  const loaded = page.waitForResponse((r) => r.url().includes('/get_onetime_bookings?'), { timeout: 20000 });
+  loaded.catch(() => {});
+  await click(page, PT.card);
+  try {
+    await loaded;
+    if (!page.url().endsWith('/userBooking')) throw new Error('url');
+  } catch {
+    throw new HttpError('Không mở được bảng lịch', 502, await jpeg(page));
+  }
+  await page.waitForTimeout(1000);
+
+  // 4. chọn ngày
+  const today = vnToday();
+  if (date !== today) {
+    const target = pickerTarget(today, date);
+    await click(page, PT.dateButton);
+    await page.waitForTimeout(1000);
+    for (let i = 0; i < target.monthsAhead; i++) {
+      await click(page, PT.nextMonth);
+      await page.waitForTimeout(600);
+    }
+    const dated = page.waitForResponse(
+      (r) => r.url().includes('get_onetime_bookings') && r.url().includes(`startDate=${date}`),
+      { timeout: 15000 },
+    );
+    dated.catch(() => {});
+    await click(page, target);
+    await page.waitForTimeout(300);
+    await click(page, PT.pickerConfirm);
+    try {
+      await dated;
+    } catch {
+      throw new HttpError(`Không chọn được ngày ${dmy(date)} trên Alobo`, 422, await jpeg(page));
+    }
+    await page.waitForTimeout(1000);
+  }
+}
+
+export interface Availability {
+  /** `free[sân - 1][cột]`: ô trống trên bảng lịch (cột 0 = 05:00, mỗi cột 30 phút). */
+  free: boolean[][];
+  /** Ảnh bảng lịch (JPEG data URL) để đối chiếu bằng mắt. */
+  screenshot: string;
+}
+
+/** Chỉ đọc: mở bảng lịch của `date` không cần đăng nhập và đọc trạng thái trống/đã đặt của mọi sân. Không chọn ô, không đặt gì. */
+export async function checkAvailability(date: string): Promise<Availability> {
+  const context = await newContext();
+  try {
+    const page = await context.newPage();
+    await openSchedule(page, date);
+    // Lưới có thể vẽ chậm hơn phản hồi API (nhất là ngày hôm nay, không qua bước chọn ngày): chờ thấy dải nhãn giờ.
+    const deadline = Date.now() + 15_000;
+    let png = await shot(page);
+    while (!hasGridHeader(png) && Date.now() < deadline) {
+      await page.waitForTimeout(500);
+      png = await shot(page);
+    }
+    const screenshot = await jpeg(page);
+    return { free: readGrid(png, measureGrid(png, screenshot)), screenshot };
+  } finally {
+    await context.close().catch(() => {});
+  }
+}
+
 export async function prepare(intent: BookingIntent, booker: Booker): Promise<Prepared> {
   const context = await newContext(booker.kind === 'account' ? booker.state : undefined);
   try {
     const page = await context.newPage();
     const probe = (pt: Point, hex: string, ms: number, msg: string) => waitColor(page, pt, hex, ms, msg);
 
-    // 1. trang sân
-    await page.goto(BRANCH_URL, { waitUntil: 'load', timeout: 45000 });
-    await probe(PT.datLich, COLOR.branchReady, 30000, 'Trang Alobo không tải xong');
-
-    // 2. dialog
-    // Flutter có thể chưa nhận click ngay sau khi trang vừa vẽ xong nên thử lại vài lần.
-    for (let attempt = 1; ; attempt++) {
-      await click(page, PT.datLich);
-      try {
-        await probe(PT.card, COLOR.dialog, 4000, 'Không mở được hộp chọn hình thức đặt');
-        break;
-      } catch (e) {
-        if (attempt >= 5) throw e;
-        if (attempt % 2 === 0) await reloadBranch(page); // bấm hai lần vẫn không ăn: lần tải này bị kẹt, tải lại
-      }
-    }
-    await page.waitForTimeout(700); // dialog còn đang animate: bấm sớm thì card không nhận
-
-    // 3. bảng lịch
-    const loaded = page.waitForResponse((r) => r.url().includes('/get_onetime_bookings?'), { timeout: 20000 });
-    loaded.catch(() => {});
-    await click(page, PT.card);
-    try {
-      await loaded;
-      if (!page.url().endsWith('/userBooking')) throw new Error('url');
-    } catch {
-      throw new HttpError('Không mở được bảng lịch', 502, await jpeg(page));
-    }
-    await page.waitForTimeout(1000);
-
-    // 4. chọn ngày
-    const today = vnToday();
-    if (intent.date !== today) {
-      const target = pickerTarget(today, intent.date);
-      await click(page, PT.dateButton);
-      await page.waitForTimeout(1000);
-      for (let i = 0; i < target.monthsAhead; i++) {
-        await click(page, PT.nextMonth);
-        await page.waitForTimeout(600);
-      }
-      const dated = page.waitForResponse(
-        (r) => r.url().includes('get_onetime_bookings') && r.url().includes(`startDate=${intent.date}`),
-        { timeout: 15000 },
-      );
-      dated.catch(() => {});
-      await click(page, target);
-      await page.waitForTimeout(300);
-      await click(page, PT.pickerConfirm);
-      try {
-        await dated;
-      } catch {
-        throw new HttpError(`Không chọn được ngày ${dmy(intent.date)} trên Alobo`, 422, await jpeg(page));
-      }
-      await page.waitForTimeout(1000);
-    }
+    // 1–4. mở bảng lịch của ngày cần đặt
+    await openSchedule(page, intent.date);
 
     // 5. tìm sân trống rồi chọn ô. Pixel trống chưa đủ: Alobo có quy định khoảng cách giữa các ca nên có thể tự nới thêm
     // ô kế bên hoặc không nhận ô. Bấm lại ô đã chọn sẽ bỏ chọn, nên mỗi lần bấm đều xem lại trạng thái và chỉ bấm ô chưa chọn.

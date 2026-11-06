@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
 import {
   BOOKING_API_URL,
   BookingError,
   cancelBooking,
+  checkAvailability,
   checkSession,
   confirmBooking,
   deleteAccount,
@@ -13,6 +14,7 @@ import {
   signOut,
   toPaymentImage,
   type Auth,
+  type Availability as AvailabilityResult,
   type BookingRequest,
   type Confirmed,
   type Paid,
@@ -26,6 +28,7 @@ import { formatDate } from '../lib/text';
 import { findBank } from '../lib/vietqr';
 import { ShotViewer } from './ShotViewer';
 import { BankTransfer } from './BankTransfer';
+import { Availability } from './Availability';
 
 type Phase = 'idle' | 'preparing' | 'prepared' | 'confirming' | 'done' | 'paying' | 'paid';
 
@@ -70,6 +73,9 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
   const [signingIn, setSigningIn] = useState(false);
   const [loginError, setLoginError] = useState<BookingError | null>(null);
   const [feeAdded, setFeeAdded] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [availability, setAvailability] = useState<AvailabilityResult | null>(null);
+  const prepareButton = useRef<HTMLButtonElement>(null);
   const [self] = useState(() => {
     const id = loadSelf();
     return id === null ? null : (loadRoster().find((m) => m.id === id) ?? null);
@@ -100,6 +106,10 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
   const identified = who === 'guest' ? settings.name.trim() !== '' && settings.phone.trim() !== '' : session !== '';
   const timeError = mode === 'form' ? fixedBlockError(form.start, form.end) : null;
   const ready = hasCode && identified && !timeError && (mode === 'form' || command.trim() !== '');
+  // Xem sân trống chỉ đọc nên không cần tên/SĐT hay đăng nhập, chỉ cần mã truy cập.
+  const canCheck = hasCode && !busy && !checking && !timeError && (mode === 'form' ? form.date !== '' : command.trim() !== '');
+  // Kết quả của ngày khác (người dùng đã đổi ngày) thì ẩn; đổi giờ cùng ngày thì lọc lại tại chỗ.
+  const shownAvailability = availability && mode === 'form' && availability.date === form.date ? availability : null;
 
   const toError = (e: unknown) => (e instanceof BookingError ? e : new BookingError('Lỗi không xác định'));
 
@@ -154,6 +164,32 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
       setError(failure(e));
       setPhase('idle');
     }
+  }
+
+  /** Chỉ đọc bảng lịch Alobo. Gõ câu lệnh thì máy chủ hiểu ngày + khung giờ, ta chuyển sang "Chọn tay" và điền sẵn form. */
+  async function check() {
+    setError(null);
+    setChecking(true);
+    try {
+      const r = await checkAvailability(auth, mode === 'command' ? { command: command.trim() } : { date: form.date });
+      setAvailability(r);
+      if (r.query) {
+        setForm({ ...form, date: r.query.date, start: r.query.start, end: r.query.end });
+        setMode('form');
+      }
+    } catch (e) {
+      setError(failure(e));
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  /** Điền sẵn form theo sân trống được chọn rồi đưa người dùng tới nút chuẩn bị; không tự đặt. */
+  function pickCourt(court: number, start: string, end: string) {
+    if (!availability) return;
+    setMode('form');
+    setForm({ date: availability.date, start, end, court });
+    setTimeout(() => prepareButton.current?.scrollIntoView({ block: 'center', behavior: 'smooth' }));
   }
 
   async function confirm() {
@@ -387,9 +423,15 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
 
       {(phase === 'idle' || phase === 'preparing') && (
         <>
-          <button type="button" class="primary" disabled={busy || !ready} onClick={prepare}>
-            Nhờ Agent chuẩn bị
-          </button>
+          <div class="stack-actions">
+            <button type="button" disabled={!canCheck} onClick={check}>
+              Kiểm tra sân trống
+            </button>
+            <button type="button" class="primary" ref={prepareButton} disabled={busy || checking || !ready} onClick={prepare}>
+              Nhờ Agent chuẩn bị
+            </button>
+          </div>
+          {checking && <p class="hint">Agent đang đọc bảng lịch Alobo, mất khoảng 30 giây…</p>}
           {phase === 'preparing' && <p class="hint">Agent đang thao tác trên Alobo, mất khoảng 30 giây…</p>}
         </>
       )}
@@ -399,6 +441,16 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
           <p class="error">{error.message}</p>
           {error.screenshot && <ShotViewer src={error.screenshot} alt="Màn hình Alobo lúc xảy ra lỗi" />}
         </>
+      )}
+
+      {phase === 'idle' && shownAvailability && (
+        <Availability
+          result={shownAvailability}
+          start={form.start}
+          end={form.end}
+          onPick={pickCourt}
+          onPickSlot={(start, end) => setForm({ ...form, start, end })}
+        />
       )}
 
       {(phase === 'prepared' || phase === 'confirming') && prepared && s && expires && (

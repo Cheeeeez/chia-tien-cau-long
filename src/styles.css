@@ -134,3 +134,18 @@ textarea { min-height: 88px; resize: vertical; }
 .section-head > button.new-board:hover { background: var(--accent-bg); }
 .notice { background: var(--accent-bg); border: 1px solid var(--accent); border-radius: 8px; padding: 8px 12px; margin: 8px 0; }
 .check.self { min-height: 36px; font-size: 0.9rem; }
+/* Kiểm tra sân trống: lưới 10 sân × 38 cột (05:00–24:00) co theo bề ngang, không cuộn ngang. */
+.avail-courts { margin: 0; }
+.avail-courts > li > span { font-weight: 600; }
+.avail-nearby { margin-top: 0; }
+.avail-grid { display: grid; grid-template-columns: 1.2rem minmax(0, 1fr); gap: 2px 4px; align-items: center; font-size: 0.7rem; color: var(--muted); }
+.avail-head { display: grid; }
+.avail-court { text-align: right; }
+.avail-row { display: grid; gap: 1px; }
+.avail-cell { height: 16px; border-radius: 2px; background: var(--accent-bg); }
+.avail-cell.busy { background: #b9bec6; }
+.avail-cell.free.sel { background: var(--accent); }
+.avail-cell.busy.sel { background: var(--error); }
+.avail-legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.avail-legend .avail-cell { display: inline-block; width: 14px; height: 14px; margin-left: 6px; }
+.avail-legend .avail-cell:first-child { margin-left: 0; }
