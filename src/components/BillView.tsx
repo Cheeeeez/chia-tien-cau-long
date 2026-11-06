@@ -30,7 +30,7 @@ export function BillView({ bill, baseUrl }: { bill: Bill; baseUrl: string }) {
       {me >= 0 && (
         <>
           {outgoing.map((t, i) => (
-            <PayCard key={`${t.from}-${t.to}-${i}`} bill={bill} t={t} baseUrl={baseUrl} />
+            <PayCard key={`${t.from}-${t.to}-${i}`} bill={bill} t={t} baseUrl={location.href} />
           ))}
           {incoming.length > 0 && (
             <p class="card">

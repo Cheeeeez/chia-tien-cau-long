@@ -1,3 +1,4 @@
+import type { Confirmed, Paid, Prepared } from './booking';
 import type { Debt, Member, SavedDraft } from './types';
 
 const ROSTER_KEY = 'caulong.roster.v1';
@@ -171,5 +172,69 @@ export function saveBookingSettings(s: BookingSettings): void {
     localStorage.setItem(BOOKING_KEY, JSON.stringify(s));
   } catch {
     // bỏ qua
+  }
+}
+
+const FLOW_KEY = 'caulong.bookingFlow.v1';
+const FLOW_MAX_AGE = 3 * 60 * 60 * 1000;
+
+/** Tiến trình đặt sân đang dở, giữ lại để khi sang app ngân hàng rồi quay về (trang tải lại) vẫn tiếp tục được. */
+export interface BookingFlow {
+  phase: 'prepared' | 'done' | 'paid';
+  prepared: Prepared;
+  done: Confirmed | null;
+  paid: Paid | null;
+  feeAdded: boolean;
+  mode: 'command' | 'form';
+  command: string;
+  form: { date: string; start: string; end: string; court: number | null };
+  savedAt: number;
+}
+
+export function saveBookingFlow(f: BookingFlow | null): void {
+  try {
+    if (!f) {
+      localStorage.removeItem(FLOW_KEY);
+      return;
+    }
+    try {
+      localStorage.setItem(FLOW_KEY, JSON.stringify(f));
+    } catch {
+      // Có thể đầy bộ nhớ vì ảnh chụp lớn: bỏ ảnh chụp, giữ mã QR thanh toán.
+      const lean: BookingFlow = {
+        ...f,
+        prepared: { ...f.prepared, screenshot: '' },
+        done: f.done && { ...f.done, screenshot: '' },
+        paid: f.paid && { ...f.paid, screenshot: '' },
+      };
+      localStorage.setItem(FLOW_KEY, JSON.stringify(lean));
+    }
+  } catch {
+    // bỏ qua
+  }
+}
+
+export function loadBookingFlow(): BookingFlow | null {
+  try {
+    const f = JSON.parse(localStorage.getItem(FLOW_KEY) ?? 'null') as BookingFlow | null;
+    const ok =
+      f &&
+      typeof f === 'object' &&
+      (f.phase === 'prepared' || f.phase === 'done' || f.phase === 'paid') &&
+      f.prepared &&
+      typeof f.prepared.id === 'string' &&
+      f.prepared.summary &&
+      typeof f.savedAt === 'number' &&
+      Date.now() - f.savedAt < FLOW_MAX_AGE &&
+      (f.phase !== 'prepared' || f.prepared.expiresAt > Date.now()) &&
+      (f.phase !== 'done' || f.done) &&
+      (f.phase !== 'paid' || f.paid);
+    if (!ok) {
+      saveBookingFlow(null);
+      return null;
+    }
+    return f;
+  } catch {
+    return null;
   }
 }

@@ -22,7 +22,7 @@ import {
 } from '../lib/booking';
 import { formatVnd } from '../lib/money';
 import { COURT_OWNER_BANK, courtTransferNote } from '../lib/courtPay';
-import { loadBookingSettings, loadDraft, loadRoster, loadSelf, saveBookingSettings, saveDraft } from '../lib/storage';
+import { loadBookingFlow, loadBookingSettings, loadDraft, loadRoster, loadSelf, saveBookingFlow, saveBookingSettings, saveDraft } from '../lib/storage';
 import { addCourtFee } from '../lib/draft';
 import { formatDate } from '../lib/text';
 import { findBank } from '../lib/vietqr';
@@ -58,21 +58,23 @@ const DONE_MESSAGE: Record<Confirmed['status'], string> = {
 
 export function Booking({ baseUrl }: { baseUrl: string }) {
   const [settings, setSettings] = useState(loadBookingSettings);
-  const [mode, setMode] = useState<'command' | 'form'>('command');
-  const [command, setCommand] = useState('');
-  const [form, setForm] = useState({ date: today(), start: '18:00', end: '20:00', court: null as number | null });
-  const [phase, setPhase] = useState<Phase>('idle');
+  // Khôi phục tiến trình dở dang (vd. quay lại từ app ngân hàng làm trang tải lại).
+  const [restored] = useState(loadBookingFlow);
+  const [mode, setMode] = useState<'command' | 'form'>(restored?.mode ?? 'command');
+  const [command, setCommand] = useState(restored?.command ?? '');
+  const [form, setForm] = useState(restored?.form ?? { date: today(), start: '18:00', end: '20:00', court: null as number | null });
+  const [phase, setPhase] = useState<Phase>(restored?.phase ?? 'idle');
   const [error, setError] = useState<BookingError | null>(null);
-  const [prepared, setPrepared] = useState<Prepared | null>(null);
-  const [done, setDone] = useState<Confirmed | null>(null);
+  const [prepared, setPrepared] = useState<Prepared | null>(restored?.prepared ?? null);
+  const [done, setDone] = useState<Confirmed | null>(restored?.done ?? null);
   const [file, setFile] = useState<File | null>(null);
-  const [paid, setPaid] = useState<Paid | null>(null);
+  const [paid, setPaid] = useState<Paid | null>(restored?.paid ?? null);
   const [now, setNow] = useState(Date.now());
   const [password, setPassword] = useState(''); // không lưu vào localStorage
   const [showCode, setShowCode] = useState(false);
   const [signingIn, setSigningIn] = useState(false);
   const [loginError, setLoginError] = useState<BookingError | null>(null);
-  const [feeAdded, setFeeAdded] = useState(false);
+  const [feeAdded, setFeeAdded] = useState(restored?.feeAdded ?? false);
   const [checking, setChecking] = useState(false);
   const [availability, setAvailability] = useState<AvailabilityResult | null>(null);
   const prepareButton = useRef<HTMLButtonElement>(null);
@@ -85,6 +87,16 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
   // Chế độ khách không gửi mã thiết bị dù máy này đã đăng nhập Alobo trước đó.
   const auth: Auth = who === 'account' ? settings : { code: settings.code, session: '' };
   useEffect(() => saveBookingSettings(settings), [settings]);
+
+  // Lưu tiến trình ở các pha ổn định; pha đang chạy quy về pha trước, idle thì xoá.
+  useEffect(() => {
+    const stable = phase === 'confirming' ? 'prepared' : phase === 'paying' ? 'done' : phase;
+    if (!prepared || (stable !== 'prepared' && stable !== 'done' && stable !== 'paid')) {
+      if (phase === 'idle') saveBookingFlow(null);
+      return;
+    }
+    saveBookingFlow({ phase: stable, prepared, done, paid, feeAdded, mode, command, form, savedAt: Date.now() });
+  }, [phase, prepared, done, paid, feeAdded]);
 
   // Đếm ngược thời gian giữ chỗ khi đang chờ ảnh chuyển khoản.
   useEffect(() => {
@@ -458,7 +470,7 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
           <p>
             Ngày {s.date.split('-').reverse().join('/')} · {s.court} · {s.start}–{s.end} · {formatVnd(s.total)}
           </p>
-          <ShotViewer src={prepared.screenshot} alt="Trang xác nhận trên Alobo" />
+          {prepared.screenshot && <ShotViewer src={prepared.screenshot} alt="Trang xác nhận trên Alobo" />}
           <p class="hint">
             Kiểm tra tên và số điện thoại trong ảnh. Hết hạn lúc {p2(expires.getHours())}:{p2(expires.getMinutes())}.
           </p>
@@ -500,14 +512,14 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
                 bank={COURT_OWNER_BANK}
                 amount={done.payment.amount}
                 note={courtTransferNote(done.payment.orderId, who === 'guest' ? settings.name : settings.phone)}
-                baseUrl={baseUrl}
+                baseUrl={`${baseUrl}?dat-san`}
                 qrSrc={done.payment.qr ?? undefined}
               />
             </div>
           ) : (
             done.payment?.qr && <img class="qr" src={done.payment.qr} width="270" alt="Mã QR thanh toán đơn Alobo" />
           )}
-          <ShotViewer src={done.screenshot} alt="Kết quả trên Alobo" />
+          {done.screenshot && <ShotViewer src={done.screenshot} alt="Kết quả trên Alobo" />}
           {done.payment ? (
             <>
               <p class="hint">
@@ -555,7 +567,7 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
       {phase === 'paid' && paid && (
         <div class="card">
           <p>Đã gửi ảnh thanh toán lên Alobo. Xem ảnh để biết Alobo đã nhận chưa.</p>
-          <ShotViewer src={paid.screenshot} alt="Kết quả sau khi gửi ảnh thanh toán" />
+          {paid.screenshot && <ShotViewer src={paid.screenshot} alt="Kết quả sau khi gửi ảnh thanh toán" />}
           <ul>
             {paid.texts.map((t) => (
               <li>{t}</li>
