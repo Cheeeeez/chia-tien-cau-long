@@ -47,4 +47,11 @@ export const config = {
   llmBaseUrl: (process.env.LLM_BASE_URL ?? 'https://api.freemodel.dev/v1').replace(/\/+$/, ''),
   llmModel: process.env.LLM_MODEL ?? 'auto',
   dataDir: process.env.DATA_DIR ?? './data',
+  /** Khoá VAPID để gửi Web Push; thiếu một trong ba thì tắt tính năng theo dõi sân. */
+  vapid:
+    process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY && process.env.VAPID_SUBJECT
+      ? { publicKey: process.env.VAPID_PUBLIC_KEY, privateKey: process.env.VAPID_PRIVATE_KEY, subject: process.env.VAPID_SUBJECT }
+      : null,
+  /** Chu kỳ đọc lại lịch Alobo cho các khung đang theo dõi (phút). */
+  watchIntervalMin: Math.max(1, Number(process.env.WATCH_INTERVAL_MIN) || 15),
 };

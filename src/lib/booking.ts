@@ -150,6 +150,57 @@ export function checkAvailability(a: Auth, req: { date: string } | { command: st
   return call(a, 'availability', 'POST', 120_000, req);
 }
 
+/** Đăng ký Web Push của thiết bị này (PushSubscription.toJSON()). */
+export interface PushSub {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+}
+
+/** Một khung giờ đang được máy chủ theo dõi sân trống. */
+export interface Watch {
+  id: string;
+  date: string;
+  start: string;
+  end: string;
+  /** Báo khi số sân trống trọn khung giảm xuống ≤ ngưỡng. */
+  threshold: number;
+}
+
+/** Khoá công khai VAPID của máy chủ (503 khi máy chủ chưa bật thông báo). */
+export function getPushKey(a: Auth): Promise<{ publicKey: string }> {
+  return call(a, 'push/key', 'GET', 10_000);
+}
+
+/** Theo dõi một khung giờ; `courts` là các sân đang trống nếu máy chủ vừa đọc lịch ngày đó, ngược lại null. */
+export function createWatch(
+  a: Auth,
+  req: { subscription: PushSub; date: string; start: string; end: string; threshold: number },
+): Promise<{ watch: Watch; courts: number[] | null }> {
+  return call(a, 'watches', 'POST', 15_000, req);
+}
+
+export async function listWatches(a: Auth, endpoint: string): Promise<Watch[]> {
+  return (await call<{ watches: Watch[] }>(a, 'watches/list', 'POST', 10_000, { endpoint })).watches;
+}
+
+export async function deleteWatch(a: Auth, id: string, endpoint: string): Promise<void> {
+  await call(a, `watches/${enc(id)}/delete`, 'POST', 10_000, { endpoint });
+}
+
+/** Link từ thông báo: `?dat-san&dat=YYYY-MM-DD&tu=HH:MM&den=HH:MM`. Hợp lệ thì trả khung giờ để điền sẵn form, không thì null. */
+export function parseWatchLink(search: string, today: string): { date: string; start: string; end: string } | null {
+  const q = new URLSearchParams(search);
+  const date = q.get('dat') ?? '';
+  const start = q.get('tu') ?? '';
+  const end = q.get('den') ?? '';
+  const time = /^([01]\d|2[0-4]):[03]0$/;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || date < today || !time.test(start) || !time.test(end)) return null;
+  const s = toMinutes(start);
+  const e = toMinutes(end);
+  if (s < 300 || e > 1440 || s >= e || fixedBlockError(start, end)) return null;
+  return { date, start, end };
+}
+
 /** `guest`: tên + SĐT khi đặt không cần tài khoản (bỏ trống nếu đã đăng nhập Alobo, Alobo tự điền). */
 export function prepareBooking(a: Auth, req: BookingRequest, guest?: { name: string; phone: string }): Promise<Prepared> {
   return call(a, 'bookings', 'POST', 150_000, { ...req, ...guest });

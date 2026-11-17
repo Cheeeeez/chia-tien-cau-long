@@ -42,6 +42,51 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+// Thông báo đẩy từ máy chủ đặt sân (theo dõi sân trống): payload { title, body, tag, url }.
+self.addEventListener('push', (e) => {
+  let p = {};
+  try {
+    p = e.data ? e.data.json() : {};
+  } catch {
+    p = { body: e.data ? e.data.text() : '' };
+  }
+  e.waitUntil(
+    self.registration.showNotification(p.title || 'Goodminton', {
+      body: p.body || '',
+      tag: p.tag,
+      renotify: Boolean(p.tag), // cùng khung báo lại thì vẫn rung/kêu
+      icon: 'icons/icon-192.png',
+      data: { url: p.url },
+    }),
+  );
+});
+
+// Bấm thông báo: dùng lại cửa sổ app đang mở (nếu có) rồi chuyển tới link; link phải cùng origin.
+self.addEventListener('notificationclick', (e) => {
+  e.notification.close();
+  let target = new URL('./?dat-san', self.registration.scope);
+  try {
+    const u = new URL((e.notification.data && e.notification.data.url) || '', self.registration.scope);
+    if (u.origin === self.location.origin) target = u;
+  } catch {
+    // giữ link mặc định
+  }
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async (list) => {
+      const open = list.find((c) => c.url.startsWith(self.registration.scope));
+      if (open) {
+        try {
+          await open.focus();
+          return await open.navigate(target.href);
+        } catch {
+          // trình duyệt không cho điều hướng: mở cửa sổ mới
+        }
+      }
+      return self.clients.openWindow(target.href);
+    }),
+  );
+});
+
 const NAV_TIMEOUT_MS = 4000;
 // ignoreVary: server có thể trả `Vary: Origin`; script/style `crossorigin` gửi Origin còn lúc precache thì không.
 const lookup = (key) =>

@@ -12,8 +12,12 @@ import { normalizePhone, validateDate, validateIntent, validateName, vnToday, ty
 import { parseCommand } from './llm.js';
 import { Pool } from './pool.js';
 import { FailureLimiter } from './ratelimit.js';
+import * as webpush from 'web-push';
+import { startWatcher, type PushPayload, type SendResult } from './watcher.js';
+import { WatchStore, classify, expired, freeCourtList, validateSubscription, type PushSub, type Watch } from './watches.js';
 
 const accounts = new AccountStore(config.dataDir, config.secretKey);
+const watches = new WatchStore(config.dataDir);
 const pool = new Pool(config.maxSessions);
 const loginFailures = new FailureLimiter(5, 15 * 60_000);
 // Mã truy cập có thể ngắn nên phải chặn đoán mò: 10 lần sai trong 15 phút thì khoá IP đó.
@@ -22,6 +26,7 @@ const accessFailures = new FailureLimiter(10, 15 * 60_000);
 const TTL_MS = 5 * 60 * 1000;
 const SLOT_WAIT_MS = 45_000; // chờ tối đa bao lâu để có chỗ chạy trình duyệt
 const MAX_BODY = 10 * 1024;
+const MAX_WATCH_BODY = 4 * 1024; // PushSubscription + vài trường nhỏ
 const MAX_IMAGE_BODY = Math.ceil((MAX_IMAGE_BYTES * 4) / 3) + 1024; // base64 + vỏ JSON
 
 /** Một lượt đặt đang mở trình duyệt. */
@@ -234,6 +239,55 @@ async function getAvailability(body: Record<string, unknown>) {
   return { date, query, free, screenshot, checkedAt };
 }
 
+async function sendPush(sub: PushSub, payload: PushPayload): Promise<SendResult> {
+  try {
+    await webpush.sendNotification(sub, JSON.stringify(payload), { TTL: 3600, urgency: 'high' });
+    return 'ok';
+  } catch (e) {
+    const code = (e as { statusCode?: number }).statusCode;
+    if (code === 404 || code === 410) return 'gone'; // thiết bị đã huỷ đăng ký
+    throw e;
+  }
+}
+
+function assertPushEnabled(): void {
+  if (!config.vapid) throw new HttpError('Máy chủ chưa bật thông báo theo dõi sân', 503);
+}
+
+/** Phần của theo dõi gửi về app: không lộ endpoint của thiết bị. */
+const publicWatch = (w: Watch) => ({ id: w.id, date: w.date, start: w.start, end: w.end, threshold: w.threshold, state: w.state });
+
+const endpointOf = (body: Record<string, unknown>): string => {
+  if (typeof body.endpoint !== 'string' || body.endpoint.length === 0 || body.endpoint.length > 1000) {
+    throw new HttpError('Thiết bị không hợp lệ', 400);
+  }
+  return body.endpoint;
+};
+
+/** Tạo (hoặc đổi ngưỡng của) theo dõi một khung giờ cho thiết bị; `courts` là các sân đang trống nếu lịch ngày đó còn trong bộ nhớ đệm. */
+function createWatch(body: Record<string, unknown>) {
+  assertPushEnabled();
+  const sub = validateSubscription(body.subscription);
+  const { date, start, end } = validateIntent({ date: body.date, start: body.start, end: body.end, court: null }, vnToday());
+  const threshold = body.threshold;
+  if (typeof threshold !== 'number' || !Number.isInteger(threshold) || threshold < 1 || threshold > 5) {
+    throw new HttpError('Ngưỡng báo phải từ 1 đến 5 sân', 400);
+  }
+  if (expired({ date, start }, Date.now())) throw new HttpError('Khung giờ này đã bắt đầu', 400);
+  const w = watches.add(sub, date, start, end, threshold);
+  // Đặt mốc ngay để sân giảm xuống ngưỡng trước lượt kiểm tra đầu tiên vẫn được báo (không thì lượt đó chỉ ghi mốc).
+  const seed = (free: boolean[][]) => {
+    const courts = freeCourtList(free, start, end);
+    watches.seedState(w.id, classify(courts.length, threshold));
+    return courts;
+  };
+  const cached = availabilityCache.get(date);
+  const fresh = cached && Date.now() - cached.at < AVAILABILITY_TTL_MS;
+  const courts = fresh ? seed(cached.value.free) : null;
+  if (!fresh) availabilityFor(date).then((r) => seed(r.free), () => {}); // nền; lỗi thì để tick đầu tiên ghi mốc
+  return { watch: publicWatch(w), courts };
+}
+
 /** Đăng nhập Alobo bằng SĐT + mật khẩu; đúng thì lưu tài khoản và cấp mã cho thiết bị này. */
 async function signIn(body: Record<string, unknown>) {
   const phone = normalizePhone(String(body.phone ?? ''));
@@ -268,6 +322,23 @@ async function route(req: IncomingMessage, res: ServerResponse, path: string): P
   }
   if (method === 'POST' && path === '/accounts') return reply(res, 200, await signIn(await readJson(req)));
   if (method === 'POST' && path === '/availability') return reply(res, 200, await getAvailability(await readJson(req)));
+
+  // Theo dõi sân trống: chỉ cần mã truy cập, mỗi thiết bị tự quản lý theo dõi của mình qua endpoint push.
+  if (method === 'GET' && path === '/push/key') {
+    assertPushEnabled();
+    return reply(res, 200, { publicKey: config.vapid!.publicKey });
+  }
+  if (method === 'POST' && path === '/watches') return reply(res, 200, createWatch(await readJson(req, MAX_WATCH_BODY)));
+  if (method === 'POST' && path === '/watches/list') {
+    assertPushEnabled();
+    return reply(res, 200, { watches: watches.list(endpointOf(await readJson(req))).map(publicWatch) });
+  }
+  const wm = method === 'POST' ? /^\/watches\/([^/]+)\/delete$/.exec(path) : null;
+  if (wm) {
+    assertPushEnabled();
+    const removed = watches.remove(wm[1], endpointOf(await readJson(req)));
+    return reply(res, removed ? 204 : 404, removed ? undefined : { error: 'Không tìm thấy theo dõi' });
+  }
 
   const caller = identify(req);
 
@@ -368,6 +439,17 @@ server.listen(config.port, () =>
     `dat-san-agent nghe ở cổng ${config.port}, ${config.allowedPhones ? `${config.allowedPhones.size} số được phép` : 'mọi số'}, tối đa ${config.maxSessions} phiên song song`,
   ),
 );
+
+if (config.vapid) {
+  webpush.setVapidDetails(config.vapid.subject, config.vapid.publicKey, config.vapid.privateKey);
+  startWatcher(
+    { store: watches, getFree: async (date) => (await availabilityFor(date)).free, send: sendPush },
+    config.watchIntervalMin * 60_000,
+  );
+  console.log(`Theo dõi sân trống: bật, kiểm tra mỗi ${config.watchIntervalMin} phút, ${watches.all().length} khung đang theo dõi`);
+} else {
+  console.log('Theo dõi sân trống: tắt (thiếu VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT)');
+}
 
 for (const sig of ['SIGINT', 'SIGTERM'] as const) {
   process.on(sig, () => {

@@ -10,8 +10,10 @@ import {
   payBooking,
   prepareBooking,
   fixedBlockError,
+  parseWatchLink,
   signIn,
   signOut,
+  toMinutes,
   toPaymentImage,
   type Auth,
   type Availability as AvailabilityResult,
@@ -29,6 +31,7 @@ import { findBank } from '../lib/vietqr';
 import { ShotViewer } from './ShotViewer';
 import { BankTransfer } from './BankTransfer';
 import { Availability } from './Availability';
+import { Watches } from './Watches';
 
 type Phase = 'idle' | 'preparing' | 'prepared' | 'confirming' | 'done' | 'paying' | 'paid';
 
@@ -60,9 +63,13 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
   const [settings, setSettings] = useState(loadBookingSettings);
   // Khôi phục tiến trình dở dang (vd. quay lại từ app ngân hàng làm trang tải lại).
   const [restored] = useState(loadBookingFlow);
-  const [mode, setMode] = useState<'command' | 'form'>(restored?.mode ?? 'command');
+  // Mở từ thông báo theo dõi sân (?dat-san&dat=&tu=&den=): điền sẵn khung giờ đó, trừ khi đang dở một lượt đặt.
+  const [link] = useState(() => (restored ? null : parseWatchLink(location.search, today())));
+  const [mode, setMode] = useState<'command' | 'form'>(restored?.mode ?? (link ? 'form' : 'command'));
   const [command, setCommand] = useState(restored?.command ?? '');
-  const [form, setForm] = useState(restored?.form ?? { date: today(), start: '18:00', end: '20:00', court: null as number | null });
+  const [form, setForm] = useState(
+    restored?.form ?? (link ? { ...link, court: null as number | null } : { date: today(), start: '18:00', end: '20:00', court: null as number | null }),
+  );
   const [phase, setPhase] = useState<Phase>(restored?.phase ?? 'idle');
   const [error, setError] = useState<BookingError | null>(null);
   const [prepared, setPrepared] = useState<Prepared | null>(restored?.prepared ?? null);
@@ -122,6 +129,18 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
   const canCheck = hasCode && !busy && !checking && !timeError && (mode === 'form' ? form.date !== '' : command.trim() !== '');
   // Kết quả của ngày khác (người dùng đã đổi ngày) thì ẩn; đổi giờ cùng ngày thì lọc lại tại chỗ.
   const shownAvailability = availability && mode === 'form' && availability.date === form.date ? availability : null;
+  // Chỉ theo dõi được khi đã xem sân trống của đúng ngày đang chọn và khung giờ hợp lệ.
+  const watchCandidate =
+    shownAvailability && !timeError && toMinutes(form.end) > toMinutes(form.start)
+      ? { date: form.date, start: form.start, end: form.end }
+      : null;
+
+  // Tự xem sân trống khi mở từ thông báo, rồi bỏ tham số khỏi URL để tải lại trang không lặp lại.
+  useEffect(() => {
+    if (!link) return;
+    history.replaceState(null, '', `${location.pathname}?dat-san`);
+    if (canCheck) void check();
+  }, []);
 
   const toError = (e: unknown) => (e instanceof BookingError ? e : new BookingError('Lỗi không xác định'));
 
@@ -440,7 +459,7 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
               Kiểm tra sân trống
             </button>
             <button type="button" class="primary" ref={prepareButton} disabled={busy || checking || !ready} onClick={prepare}>
-              Nhờ Agent chuẩn bị
+              Đặt sân
             </button>
           </div>
           {checking && <p class="hint">Agent đang đọc bảng lịch Alobo, mất khoảng 30 giây…</p>}
@@ -464,6 +483,8 @@ export function Booking({ baseUrl }: { baseUrl: string }) {
           onPickSlot={(start, end) => setForm({ ...form, start, end })}
         />
       )}
+
+      {phase === 'idle' && hasCode && <Watches auth={auth} candidate={watchCandidate} />}
 
       {(phase === 'prepared' || phase === 'confirming') && prepared && s && expires && (
         <div class="card">
