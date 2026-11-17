@@ -51,7 +51,12 @@ export function Watches({ auth, candidate }: Props) {
       const subscription = await ensureSubscription(auth);
       const r = await createWatch(auth, { subscription, ...candidate, threshold });
       await refresh();
-      const now = r.courts === null ? '' : r.courts.length === 0 ? ' Hiện đã hết sân.' : ` Hiện còn ${r.courts.length} sân.`;
+      const now =
+        r.courts === null
+          ? ''
+          : r.courts.length === 0
+            ? ' Hiện đã hết sân, sẽ báo khi có sân trống lại.'
+            : ` Hiện còn ${r.courts.length} sân.${r.courts.length <= threshold ? ' Thông báo sẽ đến trong vài giây.' : ''}`;
       setNote({ ok: true, text: `Đã bật theo dõi ${candidate.start}–${candidate.end} ngày ${formatDate(candidate.date)}.${now}` });
     } catch (e) {
       fail(e);
@@ -94,7 +99,10 @@ export function Watches({ auth, candidate }: Props) {
               <button type="button" class="primary" disabled={busy} onClick={watch}>
                 Theo dõi khung này
               </button>
-              <p class="hint">Cũng báo khi hết sân và khi có sân trống lại. Máy chủ kiểm tra định kỳ, nên thông báo có thể trễ vài phút.</p>
+              <p class="hint">
+                Khung đang còn ít hơn hoặc bằng số sân đã chọn thì báo ngay. Sau đó cũng báo khi sân giảm xuống ngưỡng, hết sân và khi có sân
+                trống lại; máy chủ kiểm tra định kỳ nên các thông báo này có thể trễ vài phút.
+              </p>
             </>
           ) : support === 'needs-install' ? (
             <p class="hint">

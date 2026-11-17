@@ -55,9 +55,13 @@ export function classify(count: number, threshold: number): Exclude<WatchState, 
   return count <= threshold ? 'few' : 'many';
 }
 
-/** Sự kiện cần báo khi trạng thái đổi từ `prev` sang `next`; null nếu không báo. Lần đọc đầu chỉ ghi mốc. */
+/**
+ * Sự kiện cần báo khi trạng thái đổi từ `prev` sang `next`; null nếu không báo.
+ * Lần đọc đầu (`unknown`): báo ngay nếu khung đã còn ít sân (≤ ngưỡng); còn nhiều hoặc hết sân thì chỉ ghi mốc.
+ */
 export function transition(prev: WatchState, next: Exclude<WatchState, 'unknown'>): WatchEvent | null {
-  if (prev === 'unknown' || prev === next) return null;
+  if (prev === 'unknown') return next === 'few' ? 'low' : null;
+  if (prev === next) return null;
   if (next === 'none') return 'soldout';
   if (prev === 'none') return 'back';
   if (prev === 'many' && next === 'few') return 'low';
@@ -123,6 +127,10 @@ export class WatchStore {
     return [...this.watches];
   }
 
+  get(id: string): Watch | undefined {
+    return this.watches.find((w) => w.id === id);
+  }
+
   list(endpoint: string): Watch[] {
     return this.watches.filter((w) => w.subscription.endpoint === endpoint);
   }
@@ -170,12 +178,6 @@ export class WatchStore {
     if (!w || w.state === state) return;
     w.state = state;
     this.save();
-  }
-
-  /** Gán mốc ban đầu lúc tạo, chỉ khi chưa có lần đọc nào (tick có thể đã ghi trước đó). */
-  seedState(id: string, state: Exclude<WatchState, 'unknown'>): void {
-    const w = this.watches.find((x) => x.id === id);
-    if (w?.state === 'unknown') this.setState(id, state);
   }
 
   /** Xoá các theo dõi đã tới giờ bắt đầu; trả về số đã xoá. */

@@ -13,8 +13,8 @@ import { parseCommand } from './llm.js';
 import { Pool } from './pool.js';
 import { FailureLimiter } from './ratelimit.js';
 import * as webpush from 'web-push';
-import { startWatcher, type PushPayload, type SendResult } from './watcher.js';
-import { WatchStore, classify, expired, freeCourtList, validateSubscription, type PushSub, type Watch } from './watches.js';
+import { evaluate, startWatcher, type PushPayload, type SendResult } from './watcher.js';
+import { WatchStore, expired, freeCourtList, validateSubscription, type PushSub, type Watch } from './watches.js';
 
 const accounts = new AccountStore(config.dataDir, config.secretKey);
 const watches = new WatchStore(config.dataDir);
@@ -275,17 +275,13 @@ function createWatch(body: Record<string, unknown>) {
   }
   if (expired({ date, start }, Date.now())) throw new HttpError('Khung giờ này đã bắt đầu', 400);
   const w = watches.add(sub, date, start, end, threshold);
-  // Đặt mốc ngay để sân giảm xuống ngưỡng trước lượt kiểm tra đầu tiên vẫn được báo (không thì lượt đó chỉ ghi mốc).
-  const seed = (free: boolean[][]) => {
-    const courts = freeCourtList(free, start, end);
-    watches.seedState(w.id, classify(courts.length, threshold));
-    return courts;
-  };
+  // Đối chiếu ngay (không đợi chu kỳ 15 phút): đã còn ≤ ngưỡng sân thì báo luôn, không thì chỉ ghi mốc.
+  const evaluateNow = (free: boolean[][]) => evaluate(w.id, free, { store: watches, send: sendPush }).catch((e) => console.error('watch evaluate', e));
   const cached = availabilityCache.get(date);
   const fresh = cached && Date.now() - cached.at < AVAILABILITY_TTL_MS;
-  const courts = fresh ? seed(cached.value.free) : null;
-  if (!fresh) availabilityFor(date).then((r) => seed(r.free), () => {}); // nền; lỗi thì để tick đầu tiên ghi mốc
-  return { watch: publicWatch(w), courts };
+  if (fresh) void evaluateNow(cached.value.free);
+  else availabilityFor(date).then((r) => evaluateNow(r.free), (e) => console.log(`watch: chưa đọc được lịch ${date} lúc tạo: ${e instanceof Error ? e.message : String(e)}`)); // nền; lỗi thì tick sau sẽ làm
+  return { watch: publicWatch(w), courts: fresh ? freeCourtList(cached.value.free, start, end) : null };
 }
 
 /** Đăng nhập Alobo bằng SĐT + mật khẩu; đúng thì lưu tài khoản và cấp mã cho thiết bị này. */

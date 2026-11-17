@@ -42,7 +42,45 @@ export interface TickDeps {
   log?: (msg: string) => void;
 }
 
-/** Một lượt kiểm tra: mỗi ngày có người theo dõi đọc lịch một lần rồi so với trạng thái đã lưu của từng khung. */
+export type EvalDeps = Pick<TickDeps, 'store' | 'send' | 'log'>;
+
+// Cùng một theo dõi không được đánh giá song song (vd. vừa tạo xong thì tick cũng tới), kẻo báo hai lần.
+const evaluating = new Set<string>();
+
+/**
+ * Đối chiếu một theo dõi với lưới `free` vừa đọc: gửi thông báo nếu trạng thái đổi (hoặc lần đầu mà đã còn ít sân), rồi lưu trạng thái.
+ * Trả `'gone'` khi thiết bị đã huỷ đăng ký (mọi theo dõi của nó đã bị xoá).
+ */
+export async function evaluate(id: string, free: boolean[][], { store, send, log = console.log }: EvalDeps): Promise<SendResult> {
+  if (evaluating.has(id)) return 'ok';
+  const w = store.get(id); // đọc lại: có thể đã đổi hoặc bị xoá từ lúc lấy danh sách
+  if (!w) return 'ok';
+  evaluating.add(id);
+  try {
+    const courts = freeCourtList(free, w.start, w.end);
+    const next = classify(courts.length, w.threshold);
+    const event = transition(w.state, next);
+    if (!event) {
+      store.setState(id, next);
+      return 'ok';
+    }
+    try {
+      if ((await send(w.subscription, buildPayload(w, event, courts))) === 'gone') {
+        store.removeEndpoint(w.subscription.endpoint);
+        return 'gone';
+      }
+      store.setState(id, next);
+    } catch (e) {
+      // Lỗi tạm thời: giữ trạng thái cũ để lượt sau thử báo lại.
+      log(`watch: gửi thông báo lỗi: ${e instanceof Error ? e.message : String(e)}`);
+    }
+    return 'ok';
+  } finally {
+    evaluating.delete(id);
+  }
+}
+
+/** Một lượt kiểm tra: mỗi ngày có người theo dõi đọc lịch một lần rồi đối chiếu từng khung của ngày đó. */
 export async function tick({ store, getFree, send, now = Date.now, log = console.log }: TickDeps): Promise<void> {
   store.purgeExpired(now());
   const byDate = new Map<string, Watch[]>();
@@ -59,24 +97,7 @@ export async function tick({ store, getFree, send, now = Date.now, log = console
     }
     for (const w of watches) {
       if (gone.has(w.subscription.endpoint)) continue;
-      const courts = freeCourtList(free, w.start, w.end);
-      const next = classify(courts.length, w.threshold);
-      const event = transition(w.state, next);
-      if (!event) {
-        store.setState(w.id, next);
-        continue;
-      }
-      try {
-        if ((await send(w.subscription, buildPayload(w, event, courts))) === 'gone') {
-          gone.add(w.subscription.endpoint);
-          store.removeEndpoint(w.subscription.endpoint);
-          continue;
-        }
-        store.setState(w.id, next);
-      } catch (e) {
-        // Lỗi tạm thời: giữ trạng thái cũ để lượt sau thử báo lại.
-        log(`watch: gửi thông báo lỗi: ${e instanceof Error ? e.message : String(e)}`);
-      }
+      if ((await evaluate(w.id, free, { store, send, log })) === 'gone') gone.add(w.subscription.endpoint);
     }
   }
 }

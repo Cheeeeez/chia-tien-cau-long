@@ -53,8 +53,8 @@ describe('classify / transition', () => {
     expect(classify(3, 2)).toBe('many');
   });
 
-  it('lần đọc đầu chỉ ghi mốc, không báo', () => {
-    expect(transition('unknown', 'few')).toBeNull();
+  it('lần đọc đầu: báo ngay nếu đã còn ít sân, còn nhiều hoặc hết sân thì chỉ ghi mốc', () => {
+    expect(transition('unknown', 'few')).toBe('low');
     expect(transition('unknown', 'none')).toBeNull();
     expect(transition('unknown', 'many')).toBeNull();
   });
@@ -144,16 +144,6 @@ describe('WatchStore', () => {
     s.add(sub(2), '2026-11-22', '18:00', '20:00', 2);
     s.removeEndpoint(sub(1).endpoint);
     expect(s.all().map((w) => w.subscription.endpoint)).toEqual([sub(2).endpoint]);
-  });
-
-  it('seedState chỉ gán khi chưa có mốc, không ghi đè mốc của tick', () => {
-    const s = new WatchStore(dir);
-    const w = s.add(sub(), '2026-11-22', '18:00', '20:00', 2);
-    s.seedState(w.id, 'many');
-    expect(s.all()[0].state).toBe('many');
-    s.setState(w.id, 'few');
-    s.seedState(w.id, 'many');
-    expect(s.all()[0].state).toBe('few');
   });
 
   it('purgeExpired xoá khung đã bắt đầu', () => {

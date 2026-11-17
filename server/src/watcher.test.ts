@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { buildPayload, tick, type PushPayload, type SendResult } from './watcher.js';
+import { buildPayload, evaluate, tick, type PushPayload, type SendResult } from './watcher.js';
 import { WatchStore, type PushSub } from './watches.js';
 
 const NOW = Date.parse('2026-11-20T00:00:00Z');
@@ -84,13 +84,52 @@ describe('tick', () => {
     expect(sent).toHaveLength(1);
   });
 
-  it('mốc đã gán lúc tạo thì lượt kiểm tra đầu tiên vẫn báo khi sân đã giảm', async () => {
-    const w = store.add(sub(), '2026-11-22', '18:00', '20:00', 2);
-    store.seedState(w.id, 'many'); // như khi tạo theo dõi lúc còn nhiều sân
+  it('lần đọc đầu mà đã còn ít sân (≤ ngưỡng) thì báo ngay, không đợi lượt sau', async () => {
     freeCount = 2;
+    store.add(sub(), '2026-11-22', '18:00', '20:00', 2);
     await run();
     expect(sent).toHaveLength(1);
     expect(sent[0].payload.body).toBe('Chỉ còn 2 sân: 1, 2');
+    expect(store.all()[0].state).toBe('few');
+    await run(); // vẫn 2 sân: không báo lại
+    expect(sent).toHaveLength(1);
+  });
+
+  it('lần đọc đầu mà đã hết sân thì chỉ ghi mốc, có sân lại mới báo', async () => {
+    freeCount = 0;
+    store.add(sub(), '2026-11-22', '18:00', '20:00', 2);
+    await run();
+    expect(sent).toHaveLength(0);
+    expect(store.all()[0].state).toBe('none');
+    freeCount = 1;
+    await run();
+    expect(sent.map((s) => s.payload.body)).toEqual(['Có sân trống lại: sân 1']);
+  });
+
+  it('evaluate ngay lúc tạo: báo luôn khi còn ít sân, và tick ngay sau đó không báo lần hai', async () => {
+    const w = store.add(sub(), '2026-11-22', '18:00', '20:00', 3);
+    await evaluate(w.id, gridWith(2), { store, send: async (s, payload) => (sent.push({ sub: s, payload }), 'ok'), log: () => {} });
+    expect(sent).toHaveLength(1);
+    freeCount = 2;
+    await run();
+    expect(sent).toHaveLength(1);
+  });
+
+  it('evaluate trùng lúc (vừa tạo + tick) chỉ báo một lần', async () => {
+    const w = store.add(sub(), '2026-11-22', '18:00', '20:00', 3);
+    let release!: () => void;
+    const gate = new Promise<void>((r) => (release = r));
+    const slowSend = async (s: PushSub, payload: PushPayload): Promise<SendResult> => {
+      await gate;
+      sent.push({ sub: s, payload });
+      return 'ok';
+    };
+    const deps = { store, send: slowSend, log: () => {} };
+    const first = evaluate(w.id, gridWith(2), deps);
+    const second = evaluate(w.id, gridWith(2), deps); // đang đánh giá: bỏ qua
+    release();
+    await Promise.all([first, second]);
+    expect(sent).toHaveLength(1);
   });
 
   it('báo hết sân rồi báo có sân lại', async () => {
